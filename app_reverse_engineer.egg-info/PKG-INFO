@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: app-reverse-engineer
+Version: 0.1.0
+Summary: Local offline-first toolkit for AI agents to reverse engineer apps and native binaries, explain features in plain English, and show evidence.
+Author: you
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: click>=8.0
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: typer>=0.9
+Requires-Dist: requests>=2.28
+Provides-Extra: mcp
+Requires-Dist: mcp>=1.0; extra == "mcp"
+Provides-Extra: ollama
+Requires-Dist: ollama>=0.1; extra == "ollama"
+Dynamic: license-file
