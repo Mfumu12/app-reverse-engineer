@@ -22,8 +22,8 @@ def default_download_dir() -> Path:
     if getattr(sys, "frozen", False):
         dl = Path.home() / "Downloads"
         if dl.exists():
-            return dl / "HyperDL"
-        return Path.home() / "HyperDL_Downloads"
+            return dl / "GenniusDM"
+        return Path.home() / "GenniusDM_Downloads"
     return Path.cwd() / "hyperdl_downloads"
 
 

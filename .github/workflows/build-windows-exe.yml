@@ -1,4 +1,4 @@
-name: Build Windows EXE (HyperDL)
+name: Build Windows EXE (Gennius DM)
 
 on:
   push:
@@ -26,19 +26,19 @@ jobs:
           pip install -e ".[dev]" pyinstaller
           pytest -v tests
 
-      - name: Build HyperDL.exe with PyInstaller
+      - name: Build GenniusDM.exe with PyInstaller
         working-directory: hyperdl
         run: |
           pyinstaller --clean --noconfirm hyperdl.spec
 
-      - name: Smoke test HyperDL.exe --version
+      - name: Smoke test GenniusDM.exe --version
         working-directory: hyperdl
         run: |
-          .\dist\HyperDL.exe --version
+          .\dist\GenniusDM.exe --version
 
-      - name: Upload HyperDL.exe artifact
+      - name: Upload GenniusDM.exe artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HyperDL-Windows-x64
-          path: hyperdl/dist/HyperDL.exe
+          name: GenniusDM-Windows-x64
+          path: hyperdl/dist/GenniusDM.exe
           if-no-files-found: error

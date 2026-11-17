@@ -178,7 +178,7 @@ class HyperDLServer:
         return web.FileResponse(html_path)
 
     async def handle_ping(self, request: web.Request) -> web.Response:
-        return web.json_response({"status": "ok", "app": "HyperDL", "version": __version__})
+        return web.json_response({"status": "ok", "app": "HyperDL", "name": "Gennius DM", "version": __version__})
 
     async def handle_list_downloads(self, request: web.Request) -> web.Response:
         self._check_auth(request)

@@ -1,30 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
 <meta charset="utf-8" />
 <style>
-  body { font-family: system-ui, sans-serif; width: 270px; margin: 0; padding: 14px; background: #0f172a; color: #e2e8f0; }
-  h3 { margin: 0 0 10px; font-size: 15px; color: #38bdf8; }
-  label { display: block; font-size: 12px; color: #94a3b8; margin-top: 8px; }
-  input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
-  button { margin-top: 12px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #0284c7; color: #fff; font-weight: 600; cursor: pointer; }
-  #status { margin-top: 8px; font-size: 12px; color: #4ade80; }
+  body { font-family: system-ui, -apple-system, sans-serif; width: 270px; margin: 0; padding: 14px; background: #11141b; color: #e4e4e7; }
+  h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: #f4f4f5; }
+  label { display: block; font-size: 11px; color: #a1a1aa; margin-top: 8px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px; border-radius: 5px; border: 1px solid #27272a; background: #0b0d11; color: #f4f4f5; font-size: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: #d4d4d8; }
+  button { margin-top: 12px; width: 100%; padding: 7px; border: 0; border-radius: 5px; background: #2563eb; color: #fff; font-weight: 500; font-size: 12px; cursor: pointer; }
+  button:hover { background: #3b82f6; }
+  #status { margin-top: 8px; font-size: 11px; color: #34d399; }
 </style>
 </head>
 <body>
-  <h3>HyperDL Extension</h3>
-  <label>Server URL
+  <h3>Gennius DM Integrator</h3>
+  <label>Servidor local
     <input id="serverUrl" type="text" value="http://127.0.0.1:8787" />
   </label>
-  <label>API Key (optional)
-    <input id="apiKey" type="text" placeholder="Optional" />
+  <label>API Key (opcional)
+    <input id="apiKey" type="text" placeholder="Opcional" />
   </label>
   <div class="row">
     <input id="autoCapture" type="checkbox" />
-    <span>Auto-intercept browser downloads</span>
+    <span>Intercetar downloads do navegador</span>
   </div>
-  <button id="save">Save &amp; Test Connection</button>
+  <button id="save">Guardar e Testar</button>
   <div id="status"></div>
   <script>
     const serverInput = document.getElementById("serverUrl");
@@ -44,11 +45,11 @@
       try {
         const r = await fetch(`${serverUrl.replace(/\/$/, "")}/api/ping`);
         const j = await r.json();
-        statusEl.style.color = "#4ade80";
-        statusEl.textContent = `Connected: ${j.app} v${j.version}`;
+        statusEl.style.color = "#34d399";
+        statusEl.textContent = `Ligado: ${j.name || j.app} v${j.version}`;
       } catch (e) {
         statusEl.style.color = "#f87171";
-        statusEl.textContent = "Cannot reach HyperDL server";
+        statusEl.textContent = "Servidor Gennius DM indisponível";
       }
     };
   </script>

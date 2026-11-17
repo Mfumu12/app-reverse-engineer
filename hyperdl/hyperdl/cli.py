@@ -132,15 +132,15 @@ def main(argv: list[str] | None = None) -> int:
         url = "http://127.0.0.1:8787"
         try:
             _api_request(url, "/api/ping")
-            print(f"[HyperDL] Ja esta em execucao em {url} — a abrir no navegador...")
+            print(f"[Gennius DM] Ja esta em execucao em {url} — a abrir no navegador...")
             webbrowser.open(url)
             return 0
         except Exception:
             pass
         cfg = HyperDLConfig(host="127.0.0.1", port=8787)
-        print(f"[HyperDL {__version__}] A iniciar em {url} ...")
-        print(f"[HyperDL] Pasta de downloads: {cfg.download_dir}")
-        print("[HyperDL] Mantenha esta janela aberta enquanto faz downloads.")
+        print(f"[Gennius DM {__version__}] A iniciar em {url} ...")
+        print(f"[Gennius DM] Pasta de downloads: {cfg.download_dir}")
+        print("[Gennius DM] Mantenha esta janela aberta enquanto faz downloads.")
         run_server(cfg, open_browser=True)
         return 0
 

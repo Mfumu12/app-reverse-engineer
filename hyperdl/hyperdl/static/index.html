@@ -3,289 +3,399 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HyperDL — Acelerador de Downloads Híbrido (IDM + ABD)</title>
+  <title>Gennius DM — Gestor e Acelerador de Downloads</title>
   <link rel="stylesheet" href="/static/tailwind.css" />
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden antialiased selection:bg-sky-500/30 selection:text-sky-200">
-  <!-- Header -->
-  <header class="shrink-0 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-    <div class="flex items-center gap-2.5">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white font-bold">
-        ⚡
+<body class="bg-[#0b0d11] text-zinc-200 h-screen flex flex-col overflow-hidden antialiased select-none selection:bg-blue-500/30 selection:text-blue-100">
+
+  <!-- Top Desktop Toolbar -->
+  <header class="shrink-0 h-12 bg-[#11141b] border-b border-zinc-800/90 px-3.5 flex items-center justify-between gap-3">
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-7 h-7 rounded-md bg-blue-600/15 border border-blue-500/35 flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12" />
+          <path d="m7 11 5 5 5-5" />
+          <path d="M4 19h16" />
+          <path d="M6 5h2M16 5h2" opacity="0.65" />
+        </svg>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="font-bold text-base tracking-tight text-white">HyperDL</span>
-        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-sky-300 border border-sky-500/30">
-          IDM + ABD Engine
-        </span>
-        <span id="connBadge" class="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/80">
-          ⏳ A ligar...
-        </span>
+      <div class="flex items-baseline gap-1.5 truncate">
+        <span class="font-semibold text-sm tracking-tight text-zinc-100">Gennius DM</span>
+        <span class="text-[11px] font-mono text-zinc-500">v1.0</span>
       </div>
     </div>
 
-    <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="openAddModal()"
-        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 transition cursor-pointer">
-        <span>+ Novo Download</span>
+    <!-- Action Toolbar -->
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <button onclick="openAddModal('single')"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 border border-blue-500/50 transition cursor-pointer">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Adicionar URL</span>
       </button>
-      <button onclick="runDemoHttp()" title="Testa 8 conexões dinâmicas + work-stealing"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
-        🚀 Demo HTTP 16MB
+
+      <div class="h-5 w-px bg-zinc-800 mx-1 hidden sm:block"></div>
+
+      <button id="btnResumeSel" onclick="resumeSelected()" disabled
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer" title="Retomar seleção">
+        <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <span class="hidden sm:inline">Retomar</span>
       </button>
-      <button onclick="runDemoHls()" title="Testa stream HLS .m3u8 multi-segmento"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
-        🎬 Demo HLS (.m3u8)
+
+      <button id="btnPauseSel" onclick="pauseSelected()" disabled
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer" title="Pausar seleção">
+        <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+        <span class="hidden sm:inline">Pausar</span>
       </button>
-      <button onclick="runDemoGithub()" title="Testa download real do GitHub (internet)"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
-        🌐 Demo GitHub
+
+      <button id="btnDeleteSel" onclick="deleteSelected()" disabled
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-rose-950/50 hover:border-rose-900/60 hover:text-rose-200 text-zinc-300 border border-zinc-800 disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer" title="Remover seleção">
+        <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>
+        <span class="hidden sm:inline">Remover</span>
       </button>
-      <select id="speedSelect" onchange="changeGlobalSpeed(this.value)" title="Limitador global de velocidade"
-        class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-200 border border-slate-700 hover:border-sky-500/60 focus:outline-none focus:border-sky-500 transition cursor-pointer">
-        <option value="0">Velocidade: Ilimitada</option>
-        <option value="512">Limite: 512 KB/s</option>
-        <option value="1024">Limite: 1 MB/s</option>
-        <option value="2048">Limite: 2 MB/s</option>
-        <option value="5120">Limite: 5 MB/s</option>
-      </select>
-      <a href="/api/extension.zip" download
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition">
-        🧩 Extensão
-      </a>
+
+      <div class="h-5 w-px bg-zinc-800 mx-1 hidden sm:block"></div>
+
+      <button onclick="openAddModal('curl')"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Importar comando cURL ou lote">
+        <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        <span class="hidden lg:inline">Importar</span>
+      </button>
+
+      <!-- Tools Dropdown -->
+      <div class="relative">
+        <button id="toolsBtn" onclick="toggleToolsMenu(event)"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span class="hidden md:inline">Ferramentas</span>
+          <svg class="w-3 h-3 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div id="toolsMenu" class="hidden absolute right-0 mt-1.5 w-60 bg-[#161a23] border border-zinc-700/90 rounded-lg shadow-xl py-1 z-40 text-xs">
+          <a href="/api/extension.zip" download onclick="closeToolsMenu()"
+            class="flex items-center justify-between px-3 py-2 text-zinc-200 hover:bg-zinc-800 transition">
+            <span>Extensão Chrome / Edge (.zip)</span>
+            <span class="text-[10px] font-mono text-zinc-500">MV3</span>
+          </a>
+          <div class="my-1 border-t border-zinc-800"></div>
+          <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Diagnóstico de Rede</div>
+          <button onclick="closeToolsMenu(); runDemoHttp()" class="w-full text-left px-3 py-2 text-zinc-300 hover:bg-zinc-800 transition cursor-pointer">
+            Teste Multi-Segmento (16 MB)
+          </button>
+          <button onclick="closeToolsMenu(); runDemoHls()" class="w-full text-left px-3 py-2 text-zinc-300 hover:bg-zinc-800 transition cursor-pointer">
+            Teste Stream HLS (.m3u8)
+          </button>
+          <button onclick="closeToolsMenu(); runDemoGithub()" class="w-full text-left px-3 py-2 text-zinc-300 hover:bg-zinc-800 transition cursor-pointer">
+            Teste Externo (GitHub Archive)
+          </button>
+        </div>
+      </div>
+
       <button onclick="openSettingsModal()"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
-        ⚙ Config
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Definições">
+        <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="hidden md:inline">Definições</span>
       </button>
     </div>
   </header>
 
   <!-- Main Workspace -->
   <div class="flex flex-1 min-h-0">
-    <!-- Sidebar -->
-    <aside class="hidden md:flex w-60 shrink-0 bg-slate-900/70 border-r border-slate-800 p-3 flex-col gap-5 overflow-y-auto">
+    <!-- Left Navigation Rail -->
+    <aside class="hidden md:flex w-56 shrink-0 bg-[#11141b] border-r border-zinc-800/90 p-2.5 flex-col gap-5 overflow-y-auto">
       <div>
-        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Estado</div>
+        <div class="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Transferências</div>
         <div class="space-y-0.5">
-          <div class="nav-item active flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition bg-sky-500/15 text-sky-300 font-semibold" data-filter-type="all" onclick="setFilter('all', '')">
-            <span>Todos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-300 tabular-nums" id="cnt-all">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition bg-zinc-800/90 text-zinc-100 font-medium" data-filter-type="all" onclick="setFilter('all', '')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              <span>Todas</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-400 tabular-nums" id="cnt-all">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="downloading" onclick="setFilter('status', 'downloading')">
-            <span>A descarregar</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-downloading">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="status" data-filter-val="downloading" onclick="setFilter('status', 'downloading')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>
+              <span>Em curso</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-downloading">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="completed" onclick="setFilter('status', 'completed')">
-            <span>Concluídos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-completed">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="status" data-filter-val="completed" onclick="setFilter('status', 'completed')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+              <span>Concluídas</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-completed">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="paused" onclick="setFilter('status', 'paused')">
-            <span>Pausados</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-paused">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="status" data-filter-val="paused" onclick="setFilter('status', 'paused')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6v12M15 6v12"/></svg>
+              <span>Em pausa</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-paused">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="error" onclick="setFilter('status', 'error')">
-            <span>Erros</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-error">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="status" data-filter-val="error" onclick="setFilter('status', 'error')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+              <span>Com erro</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-error">0</span>
           </div>
         </div>
       </div>
 
       <div>
-        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Categorias</div>
+        <div class="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Categorias</div>
         <div class="space-y-0.5">
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="video" onclick="setFilter('category', 'video')">
-            <span>🎬 Vídeo &amp; HLS</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-video">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="category" data-filter-val="video" onclick="setFilter('category', 'video')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+              <span>Vídeo &amp; Streams</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-cat-video">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="compressed" onclick="setFilter('category', 'compressed')">
-            <span>🗜 Comprimidos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-compressed">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="category" data-filter-val="compressed" onclick="setFilter('category', 'compressed')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>
+              <span>Arquivos</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-cat-compressed">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="programs" onclick="setFilter('category', 'programs')">
-            <span>⚙ Programas</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-programs">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="category" data-filter-val="programs" onclick="setFilter('category', 'programs')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 9l3 3-3 3M13 15h3"/></svg>
+              <span>Aplicações</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-cat-programs">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="documents" onclick="setFilter('category', 'documents')">
-            <span>📄 Documentos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-documents">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="category" data-filter-val="documents" onclick="setFilter('category', 'documents')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              <span>Documentos</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-cat-documents">0</span>
           </div>
-          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="music" onclick="setFilter('category', 'music')">
-            <span>🎵 Música</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-music">0</span>
+          <div class="nav-item flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200" data-filter-type="category" data-filter-val="music" onclick="setFilter('category', 'music')">
+            <span class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <span>Áudio</span>
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500 tabular-nums" id="cnt-cat-music">0</span>
           </div>
         </div>
       </div>
 
       <div>
-        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Filas (Queues)</div>
+        <div class="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Filas</div>
         <div id="queuesList" class="space-y-1"></div>
       </div>
     </aside>
 
-    <!-- Content -->
-    <main class="flex-1 flex flex-col min-w-0">
-      <!-- Live Stats Bar -->
-      <div class="px-4 py-2.5 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap text-xs">
-        <div class="flex items-center gap-5 flex-wrap">
-          <span class="text-slate-400">Velocidade Total: <b id="totalSpeed" class="text-sky-400 font-semibold tabular-nums">0 B/s</b></span>
-          <span class="text-slate-400">Ativos: <b id="activeCount" class="text-emerald-400 font-semibold tabular-nums">0</b></span>
-          <span class="text-slate-400">Conexões TCP: <b id="totalConns" class="text-indigo-400 font-semibold tabular-nums">0</b></span>
-          <span class="text-slate-400">Splits Dinâmicos: <b id="totalSplits" class="text-cyan-400 font-semibold tabular-nums">0</b></span>
+    <!-- Main Transfer Area -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#0b0d11]">
+      <!-- Search & Summary Sub-bar -->
+      <div class="px-4 py-2 bg-[#0e1117] border-b border-zinc-800/80 flex items-center justify-between gap-3 flex-wrap text-xs">
+        <div class="flex items-center gap-4 text-zinc-400">
+          <span>Taxa global: <b id="totalSpeed" class="text-zinc-100 font-mono tabular-nums">0 B/s</b></span>
+          <span class="text-zinc-700">|</span>
+          <span>Ativos: <b id="activeCount" class="text-zinc-100 font-mono tabular-nums">0</b></span>
+          <span class="text-zinc-700 hidden sm:inline">|</span>
+          <span class="hidden sm:inline">Ligações: <b id="totalConns" class="text-zinc-100 font-mono tabular-nums">0</b></span>
+          <span class="text-zinc-700 hidden sm:inline">|</span>
+          <span class="hidden sm:inline">Divisões: <b id="totalSplits" class="text-zinc-100 font-mono tabular-nums">0</b></span>
         </div>
-        <input id="searchInput" oninput="renderTable()" placeholder="Filtrar por nome ou URL..."
-          class="w-56 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition" />
+        <div class="relative">
+          <svg class="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="searchInput" oninput="renderTable()" placeholder="Procurar ficheiro ou domínio..."
+            class="w-60 pl-8 pr-3 py-1 rounded-md bg-[#161a23] border border-zinc-800 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500/70 transition" />
+        </div>
       </div>
 
       <!-- Downloads Table -->
       <div class="flex-1 overflow-auto">
         <table class="w-full border-collapse text-xs">
-          <thead class="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-400">
+          <thead class="sticky top-0 z-10 bg-[#11141b] border-b border-zinc-800 text-zinc-400 text-[11px] uppercase tracking-wide">
             <tr>
-              <th class="text-left font-semibold px-4 py-2.5">Ficheiro</th>
-              <th class="text-left font-semibold px-3 py-2.5">Tamanho</th>
-              <th class="text-left font-semibold px-3 py-2.5">Progresso</th>
-              <th class="text-left font-semibold px-3 py-2.5">Velocidade</th>
-              <th class="text-left font-semibold px-3 py-2.5">Conns</th>
-              <th class="text-left font-semibold px-3 py-2.5">ETA</th>
-              <th class="text-left font-semibold px-3 py-2.5">Estado</th>
-              <th class="text-right font-semibold px-4 py-2.5">Ações</th>
+              <th class="text-left font-medium px-4 py-2">Nome</th>
+              <th class="text-left font-medium px-3 py-2">Tamanho</th>
+              <th class="text-left font-medium px-3 py-2">Progresso</th>
+              <th class="text-left font-medium px-3 py-2">Velocidade</th>
+              <th class="text-left font-medium px-3 py-2">Conns</th>
+              <th class="text-left font-medium px-3 py-2">Restante</th>
+              <th class="text-left font-medium px-3 py-2">Estado</th>
+              <th class="text-right font-medium px-4 py-2">Ações</th>
             </tr>
           </thead>
-          <tbody id="downloadsBody" class="divide-y divide-slate-800/70"></tbody>
+          <tbody id="downloadsBody" class="divide-y divide-zinc-800/60"></tbody>
         </table>
-        <div id="emptyState" class="text-center py-16 px-6 text-slate-400 text-sm">
-          <div class="text-3xl mb-2">⚡</div>
-          Sem downloads ainda. Clica em <b class="text-slate-200">+ Novo Download</b> ou em
-          <b class="text-sky-400">🚀 Demo HTTP 16MB</b> para ver o motor multi-segmento em ação!
+        <div id="emptyState" class="text-center py-20 px-6 text-zinc-500 text-xs">
+          <svg class="w-10 h-10 mx-auto mb-3 text-zinc-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16"/>
+          </svg>
+          <p class="text-zinc-300 font-medium text-sm mb-1">Lista de transferências vazia</p>
+          <p>Clica em <span class="text-zinc-200 font-medium">Adicionar URL</span> ou cola um link (<kbd class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[10px] font-mono text-zinc-300">Ctrl+V</kbd>) para iniciar.</p>
         </div>
       </div>
 
-      <!-- Segment Inspector Drawer -->
-      <div id="inspector" class="hidden shrink-0 h-72 bg-slate-900 border-t border-slate-800 flex flex-col">
-        <div class="px-4 py-2 bg-slate-800/70 border-b border-slate-800 flex items-center justify-between gap-2 text-xs">
+      <!-- Transfer Details / Segments Drawer -->
+      <div id="inspector" class="hidden shrink-0 h-64 bg-[#11141b] border-t border-zinc-800 flex flex-col">
+        <div class="px-4 py-1.5 bg-[#151922] border-b border-zinc-800 flex items-center justify-between gap-2 text-xs">
           <div class="flex items-center gap-2.5 min-w-0">
-            <strong id="inspTitle" class="text-slate-100 truncate">Download</strong>
-            <span id="inspMeta" class="text-slate-400 truncate"></span>
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Detalhes</span>
+            <strong id="inspTitle" class="text-zinc-100 font-medium truncate">Transferência</strong>
+            <span id="inspMeta" class="text-zinc-500 font-mono text-[11px] truncate"></span>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-1.5 shrink-0">
             <button id="inspVerifyBtn" onclick="verifySelected()"
-              class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition cursor-pointer">
-              🔐 Verificar SHA-256
+              class="px-2.5 py-1 rounded bg-[#1b202b] hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 text-[11px] font-medium transition cursor-pointer">
+              Verificar SHA-256
             </button>
             <button onclick="closeInspector()"
-              class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition cursor-pointer">
+              class="px-2 py-1 rounded bg-[#1b202b] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700/80 text-[11px] transition cursor-pointer">
               ✕
             </button>
           </div>
         </div>
 
-        <div class="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div class="flex-1 overflow-auto p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div class="lg:col-span-7 flex flex-col gap-2">
-            <div class="flex items-center justify-between text-[11px] text-slate-400">
-              <span>Mapa de Segmentos (Work-Stealing Dinâmico estilo IDM)</span>
-              <span id="inspSplitBadge" class="text-cyan-400 font-medium"></span>
+            <div class="flex items-center justify-between text-[11px] text-zinc-400">
+              <span>Segmentos de transferência</span>
+              <span id="inspSplitBadge" class="text-zinc-300 font-mono text-[11px]"></span>
             </div>
-            <div id="segMap" class="flex w-full h-5 bg-slate-950 border border-slate-800 rounded-md overflow-hidden"></div>
+            <div id="segMap" class="flex w-full h-4 bg-[#0b0d11] border border-zinc-800 rounded overflow-hidden"></div>
             <div id="segGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5"></div>
           </div>
 
           <div class="lg:col-span-5 flex flex-col gap-2">
-            <div class="flex items-center justify-between text-[11px] text-slate-400">
-              <span>Throughput em Tempo Real</span>
-              <span id="inspSpeedNow" class="text-sky-400 font-semibold tabular-nums"></span>
+            <div class="flex items-center justify-between text-[11px] text-zinc-400">
+              <span>Histórico de velocidade</span>
+              <span id="inspSpeedNow" class="text-blue-400 font-mono font-medium tabular-nums"></span>
             </div>
-            <canvas id="speedChart" width="400" height="78" class="w-full h-20 bg-slate-950 border border-slate-800 rounded-lg"></canvas>
-            <div id="inspDetails" class="text-[11px] text-slate-400 leading-relaxed break-all"></div>
+            <canvas id="speedChart" width="400" height="72" class="w-full h-18 bg-[#0b0d11] border border-zinc-800 rounded"></canvas>
+            <div id="inspDetails" class="text-[11px] text-zinc-400 leading-relaxed break-all font-mono"></div>
           </div>
         </div>
       </div>
     </main>
   </div>
 
+  <!-- Bottom Desktop Status Bar -->
+  <footer class="shrink-0 h-7 bg-[#0d1016] border-t border-zinc-800/90 px-3.5 flex items-center justify-between gap-3 text-[11px] text-zinc-400">
+    <div class="flex items-center gap-3 min-w-0">
+      <span id="connBadge" class="inline-flex items-center gap-1.5 text-zinc-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+        A ligar...
+      </span>
+      <span class="text-zinc-700">|</span>
+      <span id="statusDir" class="truncate text-zinc-500 font-mono"></span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="text-zinc-500 hidden sm:inline">Limite global:</span>
+      <select id="speedSelect" onchange="changeGlobalSpeed(this.value)"
+        class="bg-[#161a23] text-zinc-300 border border-zinc-800 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:border-blue-500/70 cursor-pointer">
+        <option value="0">Sem limite</option>
+        <option value="512">512 KB/s</option>
+        <option value="1024">1 MB/s</option>
+        <option value="2048">2 MB/s</option>
+        <option value="5120">5 MB/s</option>
+      </select>
+    </div>
+  </footer>
+
   <!-- Add Download Modal -->
-  <div id="addModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm items-center justify-center p-4">
-    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
-        <span class="font-bold text-sm text-white">Adicionar Download</span>
-        <button onclick="closeAddModal()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer">✕</button>
+  <div id="addModal" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] items-center justify-center p-4">
+    <div class="w-full max-w-xl bg-[#141821] border border-zinc-700/80 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-[#11141b]">
+        <span class="font-semibold text-xs text-zinc-100 tracking-wide">Nova Transferência</span>
+        <button onclick="closeAddModal()" class="px-2 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs cursor-pointer">✕</button>
       </div>
-      <div class="p-5 space-y-4">
-        <div class="flex gap-2 border-b border-slate-800 pb-3">
-          <button class="tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer" onclick="switchAddTab('single', this)">URL Direta / HLS</button>
-          <button class="tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer" onclick="switchAddTab('curl', this)">Importar cURL</button>
-          <button class="tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer" onclick="switchAddTab('batch', this)">Lote / Wildcard</button>
+      <div class="p-4 space-y-4">
+        <div class="flex gap-1.5 border-b border-zinc-800 pb-3">
+          <button id="tabBtn-single" class="tab px-3 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 cursor-pointer" onclick="switchAddTab('single', this)">URL / Stream HLS</button>
+          <button id="tabBtn-curl" class="tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer" onclick="switchAddTab('curl', this)">Comando cURL</button>
+          <button id="tabBtn-batch" class="tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer" onclick="switchAddTab('batch', this)">Lote / Wildcard</button>
         </div>
 
         <div id="tab-single" class="tab-pane space-y-3">
           <div>
-            <label class="block text-xs text-slate-400 mb-1">URL (HTTP/HTTPS ou .m3u8)</label>
-            <input id="inUrl" type="url" placeholder="https://exemplo.com/arquivo.zip"
-              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+            <label class="block text-[11px] text-zinc-400 mb-1">Endereço (HTTP, HTTPS ou .m3u8)</label>
+            <input id="inUrl" type="url" placeholder="https://exemplo.com/ficheiro.zip"
+              class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Nome do ficheiro (opcional)</label>
-              <input id="inFilename" type="text" placeholder="Auto-detetar"
-                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+              <label class="block text-[11px] text-zinc-400 mb-1">Guardar como (opcional)</label>
+              <input id="inFilename" type="text" placeholder="Deteção automática"
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Conexões (1–32)</label>
+              <label class="block text-[11px] text-zinc-400 mb-1">Ligações simultâneas (1–32)</label>
               <input id="inConns" type="number" min="1" max="32" value="8"
-                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Fila (Queue)</label>
+              <label class="block text-[11px] text-zinc-400 mb-1">Fila</label>
               <select id="inQueue"
-                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500"></select>
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"></select>
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">SHA-256 esperado (opcional)</label>
+              <label class="block text-[11px] text-zinc-400 mb-1">SHA-256 esperado (opcional)</label>
               <input id="inChecksum" type="text" placeholder="Opcional"
-                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500" />
             </div>
           </div>
         </div>
 
         <div id="tab-curl" class="tab-pane hidden">
-          <label class="block text-xs text-slate-400 mb-1">Cola o comando cURL (copiado do Chrome/Edge DevTools)</label>
+          <label class="block text-[11px] text-zinc-400 mb-1">Comando cURL (Chrome / Edge DevTools)</label>
           <textarea id="inCurl" rows="5" placeholder="curl 'https://...' -H 'Cookie: ...' -H 'User-Agent: ...'"
-            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500"></textarea>
+            class="w-full px-3 py-2 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500"></textarea>
         </div>
 
         <div id="tab-batch" class="tab-pane hidden">
-          <label class="block text-xs text-slate-400 mb-1">Padrão Wildcard (ex: <code class="text-sky-300">https://host/part_[01..10].zip</code>) ou várias URLs</label>
+          <label class="block text-[11px] text-zinc-400 mb-1">Padrão Wildcard (ex: <code class="text-blue-400">https://host/parte_[01..10].zip</code>) ou lista de URLs</label>
           <textarea id="inBatch" rows="5" placeholder="https://exemplo.com/arquivos/parte_[01..08].bin"
-            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500"></textarea>
+            class="w-full px-3 py-2 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500"></textarea>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <button onclick="closeAddModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">Cancelar</button>
-          <button onclick="submitAddModal()" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 cursor-pointer">Iniciar Download</button>
+        <div class="flex justify-end gap-2 pt-1">
+          <button onclick="closeAddModal()" class="px-3.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer">Cancelar</button>
+          <button onclick="submitAddModal()" class="px-4 py-1.5 rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 cursor-pointer">Descarregar</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Settings Modal -->
-  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm items-center justify-center p-4">
-    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
-        <span class="font-bold text-sm text-white">Configurações HyperDL</span>
-        <button onclick="closeSettingsModal()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer">✕</button>
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#141821] border border-zinc-700/80 rounded-xl shadow-2xl overflow-hidden">
+      <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-[#11141b]">
+        <span class="font-semibold text-xs text-zinc-100 tracking-wide">Definições — Gennius DM</span>
+        <button onclick="closeSettingsModal()" class="px-2 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs cursor-pointer">✕</button>
       </div>
-      <div class="p-5 space-y-3">
+      <div class="p-4 space-y-3">
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Pasta de Downloads</label>
+          <label class="block text-[11px] text-zinc-400 mb-1">Diretório de Destino</label>
           <input id="setDir" type="text"
-            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+            class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Conexões padrão</label>
+            <label class="block text-[11px] text-zinc-400 mb-1">Ligações por defeito</label>
             <input id="setConns" type="number" min="1" max="32"
-              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+              class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
           </div>
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Limite global (KB/s)</label>
+            <label class="block text-[11px] text-zinc-400 mb-1">Limite global (KB/s)</label>
             <input id="setLimit" type="number" min="0"
-              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+              class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-          <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">Fechar</button>
-          <button onclick="saveSettings()" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 cursor-pointer">Guardar</button>
+          <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer">Fechar</button>
+          <button onclick="saveSettings()" class="px-4 py-1.5 rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 cursor-pointer">Guardar</button>
         </div>
       </div>
     </div>
@@ -301,26 +411,25 @@
   let speedHistory = [];
   let wsConnected = false;
 
-  const STATUS_CLASSES = {
-    downloading: "bg-sky-500/20 text-sky-300 border-sky-500/30",
-    completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-    paused: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-    queued: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-    probing: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-    assembling: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-    error: "bg-rose-500/20 text-rose-300 border-rose-500/30",
-    cancelled: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+  const STATUS_MAP = {
+    downloading: { label: "A transferir", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+    completed:   { label: "Concluído",    cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+    paused:      { label: "Pausado",      cls: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+    queued:      { label: "Em fila",      cls: "bg-zinc-700/40 text-zinc-300 border-zinc-600/40" },
+    probing:     { label: "A analisar",   cls: "bg-zinc-700/40 text-zinc-300 border-zinc-600/40" },
+    assembling:  { label: "A montar",     cls: "bg-zinc-700/40 text-zinc-300 border-zinc-600/40" },
+    error:       { label: "Erro",         cls: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
+    cancelled:   { label: "Cancelado",    cls: "bg-rose-500/15 text-rose-300 border-rose-500/30" },
   };
 
-  function setConnBadge(text, colorClass) {
+  function setConnBadge(text, dotColor) {
     const b = document.getElementById("connBadge");
     if (!b) return;
-    b.textContent = text;
-    b.className = `text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${colorClass}`;
+    b.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span><span>${esc(text)}</span>`;
   }
 
   function fmtBytes(n) {
-    if (n === null || n === undefined || n < 0) return "Desconhecido";
+    if (n === null || n === undefined || n < 0) return "—";
     const units = ["B", "KB", "MB", "GB", "TB"];
     let i = 0;
     let v = Number(n);
@@ -337,6 +446,30 @@
     return String(str ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   }
 
+  function toggleToolsMenu(ev) {
+    ev.stopPropagation();
+    document.getElementById("toolsMenu").classList.toggle("hidden");
+  }
+  function closeToolsMenu() {
+    document.getElementById("toolsMenu").classList.add("hidden");
+  }
+  document.addEventListener("click", closeToolsMenu);
+
+  // Native desktop paste shortcut: paste URL or cURL anywhere
+  document.addEventListener("paste", (ev) => {
+    const tag = (ev.target && ev.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea") return;
+    const text = (ev.clipboardData || window.clipboardData).getData("text").trim();
+    if (!text) return;
+    if (/^curl\s+/i.test(text)) {
+      openAddModal("curl");
+      document.getElementById("inCurl").value = text;
+    } else if (/^https?:\/\//i.test(text)) {
+      openAddModal("single");
+      document.getElementById("inUrl").value = text;
+    }
+  });
+
   async function loadSnapshot() {
     try {
       const [dlRes, qRes, sRes] = await Promise.all([
@@ -350,9 +483,9 @@
       settings = sRes || {};
       syncSettingsUI();
       renderAll();
-      if (!wsConnected) setConnBadge("🟡 HTTP Ativo", "bg-amber-500/15 text-amber-300 border-amber-500/30");
+      if (!wsConnected) setConnBadge("Ligado (HTTP)", "bg-amber-400");
     } catch (e) {
-      setConnBadge("🔴 Desligado", "bg-rose-500/15 text-rose-300 border-rose-500/30");
+      setConnBadge("Desligado", "bg-rose-500");
     }
   }
 
@@ -362,7 +495,7 @@
       const ws = new WebSocket(`${proto}//${location.host}/api/ws`);
       ws.onopen = () => {
         wsConnected = true;
-        setConnBadge("🟢 Tempo Real", "bg-emerald-500/15 text-emerald-300 border-emerald-500/30");
+        setConnBadge("Ligado (Tempo real)", "bg-emerald-400");
       };
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data);
@@ -394,7 +527,7 @@
       ws.onerror = () => { wsConnected = false; };
       ws.onclose = () => {
         wsConnected = false;
-        setConnBadge("🟡 HTTP Polling", "bg-amber-500/15 text-amber-300 border-amber-500/30");
+        setConnBadge("HTTP Polling", "bg-amber-400");
         setTimeout(connectWS, 2000);
       };
     } catch (e) {
@@ -413,20 +546,22 @@
     const sel = document.getElementById("speedSelect");
     const v = String(settings.global_speed_limit_kbps || 0);
     if ([...sel.options].some(o => o.value === v)) sel.value = v;
+    const dirEl = document.getElementById("statusDir");
+    if (dirEl && settings.download_dir) dirEl.textContent = settings.download_dir;
   }
 
   function setFilter(type, value) {
     filter = { type, value };
     document.querySelectorAll(".nav-item").forEach(el => {
-      el.classList.remove("bg-sky-500/15", "text-sky-300", "font-semibold");
-      el.classList.add("text-slate-300");
+      el.classList.remove("bg-zinc-800/90", "text-zinc-100", "font-medium");
+      el.classList.add("text-zinc-400");
     });
     const selector = type === "all"
       ? `[data-filter-type="all"]`
       : `[data-filter-type="${type}"][data-filter-val="${value}"]`;
     document.querySelectorAll(selector).forEach(el => {
-      el.classList.remove("text-slate-300");
-      el.classList.add("bg-sky-500/15", "text-sky-300", "font-semibold");
+      el.classList.remove("text-zinc-400");
+      el.classList.add("bg-zinc-800/90", "text-zinc-100", "font-medium");
     });
     renderQueues();
     renderTable();
@@ -436,8 +571,17 @@
     renderSidebarCounts();
     renderQueues();
     renderStats();
+    renderToolbarActions();
     renderTable();
     renderInspector();
+  }
+
+  function renderToolbarActions() {
+    const d = selectedId ? downloads.get(selectedId) : null;
+    const isActive = d && ["downloading", "probing", "assembling", "queued"].includes(d.status);
+    document.getElementById("btnResumeSel").disabled = !d || isActive || d.status === "completed";
+    document.getElementById("btnPauseSel").disabled = !d || !isActive;
+    document.getElementById("btnDeleteSel").disabled = !d;
   }
 
   function renderSidebarCounts() {
@@ -457,12 +601,12 @@
     const prevSel = sel.value;
     el.innerHTML = queues.map(q => {
       const isAct = filter.type === "queue" && filter.value === q.id;
-      return `<div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition ${isAct ? 'bg-indigo-500/20 text-indigo-300 font-semibold' : 'text-slate-300 hover:bg-slate-800/80'}" onclick="setFilter('queue','${esc(q.id)}')">
+      return `<div class="flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition ${isAct ? 'bg-zinc-800/90 text-zinc-100 font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}" onclick="setFilter('queue','${esc(q.id)}')">
         <span class="flex items-center gap-2 truncate">
-          <span class="w-2 h-2 rounded-full ${q.is_running ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-500'}"></span>
+          <span class="w-1.5 h-1.5 rounded-full ${q.is_running ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
           <span class="truncate">${esc(q.name)}</span>
         </span>
-        <button class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] cursor-pointer" onclick="event.stopPropagation(); toggleQueue('${esc(q.id)}', ${q.is_running})">${q.is_running ? '⏸' : '▶'}</button>
+        <button class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-[10px] text-zinc-300 cursor-pointer" onclick="event.stopPropagation(); toggleQueue('${esc(q.id)}', ${q.is_running})">${q.is_running ? 'Pausar' : 'Iniciar'}</button>
       </div>`;
     }).join("");
     sel.innerHTML = queues.map(q => `<option value="${esc(q.id)}">${esc(q.name)}</option>`).join("");
@@ -504,36 +648,37 @@
     body.innerHTML = list.map(d => {
       const pct = d.progress || 0;
       const isActive = ["downloading", "probing", "assembling", "queued"].includes(d.status);
-      const badgeCls = STATUS_CLASSES[d.status] || "bg-slate-800 text-slate-300 border-slate-700";
-      return `<tr class="cursor-pointer transition ${selectedId === d.id ? 'bg-sky-500/12' : 'hover:bg-slate-900/70'}" onclick="selectDownload('${esc(d.id)}')">
-        <td class="px-4 py-2.5">
-          <div class="font-semibold text-slate-100 max-w-xs truncate" title="${esc(d.filename)}">${esc(d.filename)}</div>
-          <div class="text-[11px] text-slate-400 max-w-xs truncate" title="${esc(d.url)}">${esc(d.download_type.toUpperCase())} • ${esc(d.url)}</div>
-          ${d.error_message ? `<div class="text-[11px] text-rose-300 mt-0.5">⚠ ${esc(d.error_message)}</div>` : ''}
+      const stInfo = STATUS_MAP[d.status] || { label: d.status, cls: "bg-zinc-800 text-zinc-300 border-zinc-700" };
+      const barColor = d.status === 'completed' ? 'bg-emerald-500' : d.status === 'paused' ? 'bg-amber-500' : d.status === 'error' ? 'bg-rose-500' : 'bg-blue-500';
+      return `<tr class="cursor-pointer transition ${selectedId === d.id ? 'bg-blue-500/10' : 'hover:bg-[#131720]'}" onclick="selectDownload('${esc(d.id)}')">
+        <td class="px-4 py-2">
+          <div class="font-medium text-zinc-100 max-w-xs truncate" title="${esc(d.filename)}">${esc(d.filename)}</div>
+          <div class="text-[11px] text-zinc-500 max-w-xs truncate" title="${esc(d.url)}">${esc(d.download_type.toUpperCase())} · ${esc(d.url)}</div>
+          ${d.error_message ? `<div class="text-[11px] text-rose-400 mt-0.5">${esc(d.error_message)}</div>` : ''}
         </td>
-        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">${fmtBytes(d.downloaded_bytes)} / ${fmtBytes(d.total_size)}</td>
-        <td class="px-3 py-2.5">
+        <td class="px-3 py-2 text-zinc-300 font-mono text-[11px] tabular-nums whitespace-nowrap">${fmtBytes(d.downloaded_bytes)} / ${fmtBytes(d.total_size)}</td>
+        <td class="px-3 py-2">
           <div class="flex items-center gap-2">
-            <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div class="h-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-150" style="width:${pct}%"></div>
+            <div class="w-28 h-1.5 bg-zinc-800 rounded-sm overflow-hidden">
+              <div class="h-full ${barColor} transition-all duration-150" style="width:${pct}%"></div>
             </div>
-            <span class="text-[11px] text-slate-300 w-11 tabular-nums">${pct.toFixed(1)}%</span>
+            <span class="text-[11px] font-mono text-zinc-300 w-11 tabular-nums">${pct.toFixed(1)}%</span>
           </div>
         </td>
-        <td class="px-3 py-2.5 text-slate-200 tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtBytes(d.speed_bps) + '/s' : '—'}</td>
-        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">
-          ${d.active_connections || 0}/${d.max_connections}${d.split_count ? ` <span class="text-cyan-400 text-[11px]">(+${d.split_count})</span>` : ''}
+        <td class="px-3 py-2 text-zinc-200 font-mono text-[11px] tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtBytes(d.speed_bps) + '/s' : '—'}</td>
+        <td class="px-3 py-2 text-zinc-300 font-mono text-[11px] tabular-nums whitespace-nowrap">
+          ${d.active_connections || 0}/${d.max_connections}${d.split_count ? ` <span class="text-zinc-500">(+${d.split_count})</span>` : ''}
         </td>
-        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtEta(d.eta_seconds) : '—'}</td>
-        <td class="px-3 py-2.5">
-          <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${badgeCls}">${esc(d.status)}</span>
+        <td class="px-3 py-2 text-zinc-400 font-mono text-[11px] tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtEta(d.eta_seconds) : '—'}</td>
+        <td class="px-3 py-2">
+          <span class="inline-block px-2 py-0.5 rounded text-[10px] font-medium border ${stInfo.cls}">${esc(stInfo.label)}</span>
         </td>
-        <td class="px-4 py-2.5 text-right whitespace-nowrap space-x-1" onclick="event.stopPropagation()">
+        <td class="px-4 py-2 text-right whitespace-nowrap space-x-1" onclick="event.stopPropagation()">
           ${isActive
-            ? `<button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs cursor-pointer" onclick="pauseDl('${esc(d.id)}')" title="Pausar">⏸</button>`
-            : (d.status !== 'completed' ? `<button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs cursor-pointer" onclick="resumeDl('${esc(d.id)}')" title="Retomar">▶</button>` : '')}
-          ${d.status === 'completed' ? `<a class="inline-block px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-emerald-300" href="/api/downloads/${esc(d.id)}/file" title="Baixar ficheiro">⬇</a>` : ''}
-          <button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-500/50 text-rose-300 text-xs cursor-pointer" onclick="deleteDl('${esc(d.id)}')" title="Remover">🗑</button>
+            ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="pauseDl('${esc(d.id)}')" title="Pausar">Pausar</button>`
+            : (d.status !== 'completed' ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="resumeDl('${esc(d.id)}')" title="Retomar">Retomar</button>` : '')}
+          ${d.status === 'completed' ? `<a class="inline-block px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-emerald-400 text-[11px]" href="/api/downloads/${esc(d.id)}/file" title="Guardar ficheiro">Abrir</a>` : ''}
+          <button class="px-2 py-1 rounded bg-[#161a23] hover:bg-rose-950/50 border border-zinc-800 hover:border-rose-900/60 text-zinc-400 hover:text-rose-300 text-[11px] cursor-pointer" onclick="deleteDl('${esc(d.id)}')" title="Remover">✕</button>
         </td>
       </tr>`;
     }).join("");
@@ -543,12 +688,14 @@
     if (selectedId !== id) speedHistory = [];
     selectedId = id;
     document.getElementById("inspector").classList.remove("hidden");
+    renderToolbarActions();
     renderTable();
     renderInspector();
   }
   function closeInspector() {
     selectedId = null;
     document.getElementById("inspector").classList.add("hidden");
+    renderToolbarActions();
     renderTable();
   }
 
@@ -556,8 +703,8 @@
     if (!selectedId || !downloads.has(selectedId)) return;
     const d = downloads.get(selectedId);
     document.getElementById("inspTitle").textContent = d.filename;
-    document.getElementById("inspMeta").textContent = `${d.download_type.toUpperCase()} • Range: ${d.supports_range ? 'Sim' : 'Não'} • ETag: ${d.etag || '—'}`;
-    document.getElementById("inspSplitBadge").textContent = `${(d.segments || []).length} segmentos (${d.split_count || 0} splits dinâmicos)`;
+    document.getElementById("inspMeta").textContent = `${d.download_type.toUpperCase()} · Range: ${d.supports_range ? 'Sim' : 'Não'} · ETag: ${d.etag || '—'}`;
+    document.getElementById("inspSplitBadge").textContent = `${(d.segments || []).length} segmentos (${d.split_count || 0} divisões)`;
     document.getElementById("inspSpeedNow").textContent = fmtBytes(d.speed_bps) + "/s";
     document.getElementById("inspVerifyBtn").style.display = d.status === "completed" ? "inline-flex" : "none";
 
@@ -567,26 +714,26 @@
       const segTotal = d.download_type === 'hls' ? 1 : Math.max(1, s.total_bytes || 1);
       const widthPct = d.download_type === 'hls' ? (100 / Math.max(1, segs.length)) : (segTotal / Math.max(1, total)) * 100;
       const fillPct = s.status === 'completed' ? 100 : (d.download_type === 'hls' ? (s.status === 'downloading' ? 50 : 0) : Math.min(100, (s.downloaded_bytes / segTotal) * 100));
-      const colorCls = s.status === 'completed' ? 'bg-emerald-500' : s.status === 'downloading' ? 'bg-sky-400' : s.status === 'error' ? 'bg-rose-500' : 'bg-amber-400';
-      return `<div class="h-full border-r border-slate-950 bg-slate-800" style="width:${widthPct}%" title="Seg #${s.segment_index}: ${s.status} (${fillPct.toFixed(0)}%)">
+      const colorCls = s.status === 'completed' ? 'bg-emerald-500' : s.status === 'downloading' ? 'bg-blue-500' : s.status === 'error' ? 'bg-rose-500' : 'bg-amber-500';
+      return `<div class="h-full border-r border-[#0b0d11] bg-zinc-800" style="width:${widthPct}%" title="Segmento #${s.segment_index}: ${s.status} (${fillPct.toFixed(0)}%)">
         <div class="h-full transition-all duration-150 ${colorCls}" style="width:${fillPct}%"></div>
       </div>`;
     }).join("");
 
     document.getElementById("segGrid").innerHTML = segs.slice(0, 24).map(s => {
       const pct = s.status === 'completed' ? 100 : (s.total_bytes > 0 ? Math.min(100, (s.downloaded_bytes / s.total_bytes) * 100) : 0);
-      return `<div class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-[11px]">
+      return `<div class="bg-[#0b0d11] border border-zinc-800/80 rounded px-2 py-1 text-[11px]">
         <div class="flex justify-between">
-          <b class="text-slate-200">#${s.segment_index}</b>
-          <span class="text-sky-400 tabular-nums">${s.status === 'downloading' ? fmtBytes(s.speed_bps) + '/s' : s.status}</span>
+          <span class="font-mono text-zinc-300">#${s.segment_index}</span>
+          <span class="font-mono text-blue-400 tabular-nums">${s.status === 'downloading' ? fmtBytes(s.speed_bps) + '/s' : s.status}</span>
         </div>
-        <div class="text-slate-400 mt-0.5 tabular-nums">${fmtBytes(s.downloaded_bytes)}${s.total_bytes > 0 ? ' / ' + fmtBytes(s.total_bytes) : ''} (${pct.toFixed(0)}%)</div>
+        <div class="text-zinc-500 mt-0.5 font-mono text-[10px] tabular-nums">${fmtBytes(s.downloaded_bytes)}${s.total_bytes > 0 ? ' / ' + fmtBytes(s.total_bytes) : ''} (${pct.toFixed(0)}%)</div>
       </div>`;
     }).join("");
 
-    let info = `<b class="text-slate-300">Caminho:</b> ${esc(d.file_path)}<br/>`;
-    if (d.actual_checksum) info += `<b class="text-slate-300">${esc((d.checksum_algorithm || 'sha256').toUpperCase())}:</b> <code class="text-emerald-300">${esc(d.actual_checksum)}</code><br/>`;
-    if (d.error_message) info += `<span class="text-rose-300"><b>Erro:</b> ${esc(d.error_message)}</span>`;
+    let info = `Destino: ${esc(d.file_path)}<br/>`;
+    if (d.actual_checksum) info += `${esc((d.checksum_algorithm || 'sha256').toUpperCase())}: <span class="text-emerald-400">${esc(d.actual_checksum)}</span><br/>`;
+    if (d.error_message) info += `<span class="text-rose-400">Erro: ${esc(d.error_message)}</span>`;
     document.getElementById("inspDetails").innerHTML = info;
 
     drawSpeedChart();
@@ -605,11 +752,11 @@
       const y = h - 6 - (v / maxV) * (h - 14);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = "#38bdf8";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 1.75;
     ctx.stroke();
     ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    ctx.fillStyle = "rgba(56,189,248,0.16)";
+    ctx.fillStyle = "rgba(59,130,246,0.14)";
     ctx.fill();
   }
 
@@ -628,6 +775,10 @@
   async function pauseDl(id) { await api(`/api/downloads/${id}/pause`, { method: "POST" }); }
   async function resumeDl(id) { await api(`/api/downloads/${id}/resume`, { method: "POST" }); }
   async function deleteDl(id) { await api(`/api/downloads/${id}?delete_file=true`, { method: "DELETE" }); }
+  function pauseSelected() { if (selectedId) pauseDl(selectedId); }
+  function resumeSelected() { if (selectedId) resumeDl(selectedId); }
+  function deleteSelected() { if (selectedId) deleteDl(selectedId); }
+
   async function toggleQueue(id, running) {
     await api(`/api/queues/${id}/${running ? 'stop' : 'start'}`, { method: "POST" });
     const q = await api("/api/queues");
@@ -647,7 +798,7 @@
       downloads.set(rec.id, rec);
       selectDownload(rec.id);
       renderAll();
-    } catch (e) { alert("Erro ao iniciar Demo HTTP: " + e.message); }
+    } catch (e) { alert("Erro ao iniciar teste HTTP: " + e.message); }
   }
   async function runDemoHls() {
     try {
@@ -655,7 +806,7 @@
       downloads.set(rec.id, rec);
       selectDownload(rec.id);
       renderAll();
-    } catch (e) { alert("Erro ao iniciar Demo HLS: " + e.message); }
+    } catch (e) { alert("Erro ao iniciar teste HLS: " + e.message); }
   }
   async function runDemoGithub() {
     try {
@@ -663,13 +814,15 @@
       downloads.set(rec.id, rec);
       selectDownload(rec.id);
       renderAll();
-    } catch (e) { alert("Erro ao iniciar Demo GitHub: " + e.message); }
+    } catch (e) { alert("Erro ao iniciar teste externo: " + e.message); }
   }
 
-  function openAddModal() {
+  function openAddModal(initialTab = "single") {
     const m = document.getElementById("addModal");
     m.classList.remove("hidden");
     m.classList.add("flex");
+    const btn = document.getElementById(`tabBtn-${initialTab}`);
+    if (btn) switchAddTab(initialTab, btn);
   }
   function closeAddModal() {
     const m = document.getElementById("addModal");
@@ -679,9 +832,9 @@
   function switchAddTab(tab, btn) {
     addTab = tab;
     document.querySelectorAll(".tab").forEach(t => {
-      t.className = "tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer";
+      t.className = "tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer";
     });
-    btn.className = "tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer";
+    btn.className = "tab px-3 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 cursor-pointer";
     document.querySelectorAll(".tab-pane").forEach(p => p.classList.add("hidden"));
     document.getElementById(`tab-${tab}`).classList.remove("hidden");
   }
@@ -745,6 +898,7 @@
         global_speed_limit_kbps: Number(document.getElementById("setLimit").value),
       }),
     });
+    await loadSnapshot();
     closeSettingsModal();
   }
 
