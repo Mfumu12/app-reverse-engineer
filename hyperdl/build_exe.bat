@@ -5,7 +5,7 @@ echo === Compilando GenniusDM.exe (Desktop + WebView2) com PyInstaller ===
 python -m venv .venv-build
 call .venv-build\Scripts\activate.bat
 python -m pip install --upgrade pip
-pip install -e . pywebview pyinstaller
+pip install -e . pywebview yt-dlp imageio-ffmpeg pyinstaller
 pyinstaller --clean --noconfirm hyperdl.spec
 echo.
 if exist dist\GenniusDM.exe (

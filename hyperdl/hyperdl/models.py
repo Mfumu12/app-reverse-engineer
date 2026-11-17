@@ -29,6 +29,7 @@ class SegmentStatus(str, Enum):
 class DownloadType(str, Enum):
     HTTP = "http"
     HLS = "hls"
+    YOUTUBE = "youtube"
 
 
 class Category(str, Enum):
@@ -131,6 +132,7 @@ class DownloadRecord:
     expected_checksum: str = ""
     checksum_algorithm: str = "sha256"
     actual_checksum: str = ""
+    media_options: dict[str, Any] = field(default_factory=dict)
     created_at: float = 0.0
     updated_at: float = 0.0
     completed_at: float = 0.0
@@ -173,6 +175,7 @@ class DownloadRecord:
             "expected_checksum": self.expected_checksum,
             "checksum_algorithm": self.checksum_algorithm,
             "actual_checksum": self.actual_checksum,
+            "media_options": self.media_options,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "completed_at": self.completed_at,

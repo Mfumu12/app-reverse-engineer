@@ -34,6 +34,12 @@
         <span>Adicionar URL</span>
       </button>
 
+      <button onclick="openAddModal('youtube')"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-200 border border-zinc-800 transition cursor-pointer" title="Descarregar vídeo ou áudio do YouTube">
+        <svg class="w-3.5 h-3.5 text-rose-500" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+        <span>YouTube</span>
+      </button>
+
       <div class="h-5 w-px bg-zinc-800 mx-1 hidden sm:block"></div>
 
       <button id="btnResumeSel" onclick="resumeSelected()" disabled
@@ -315,8 +321,9 @@
         <button onclick="closeAddModal()" class="px-2 py-0.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs cursor-pointer">✕</button>
       </div>
       <div class="p-4 space-y-4">
-        <div class="flex gap-1.5 border-b border-zinc-800 pb-3">
+        <div class="flex gap-1.5 border-b border-zinc-800 pb-3 flex-wrap">
           <button id="tabBtn-single" class="tab px-3 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 cursor-pointer" onclick="switchAddTab('single', this)">URL / Stream HLS</button>
+          <button id="tabBtn-youtube" class="tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer" onclick="switchAddTab('youtube', this)">YouTube</button>
           <button id="tabBtn-curl" class="tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer" onclick="switchAddTab('curl', this)">Comando cURL</button>
           <button id="tabBtn-batch" class="tab px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 border border-transparent cursor-pointer" onclick="switchAddTab('batch', this)">Lote / Wildcard</button>
         </div>
@@ -357,6 +364,69 @@
           <label class="block text-[11px] text-zinc-400 mb-1">Comando cURL (Chrome / Edge DevTools)</label>
           <textarea id="inCurl" rows="5" placeholder="curl 'https://...' -H 'Cookie: ...' -H 'User-Agent: ...'"
             class="w-full px-3 py-2 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+
+        <div id="tab-youtube" class="tab-pane hidden space-y-3">
+          <div>
+            <label class="block text-[11px] text-zinc-400 mb-1">Link do vídeo ou música no YouTube</label>
+            <div class="flex gap-2">
+              <input id="ytUrl" type="url" placeholder="https://www.youtube.com/watch?v=..."
+                class="flex-1 px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
+              <button id="ytProbeBtn" type="button" onclick="probeYoutubeUrl()"
+                class="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition cursor-pointer shrink-0">
+                Analisar
+              </button>
+            </div>
+          </div>
+
+          <div id="ytPreviewCard" class="hidden p-2.5 rounded-lg bg-[#0b0d11] border border-zinc-800 flex items-center gap-3">
+            <img id="ytThumb" src="" alt="" class="w-24 h-14 object-cover rounded border border-zinc-800 shrink-0 bg-zinc-900" />
+            <div class="min-w-0 flex-1">
+              <div id="ytTitle" class="text-xs font-medium text-zinc-100 truncate"></div>
+              <div id="ytChannel" class="text-[11px] text-zinc-400 mt-0.5 truncate"></div>
+            </div>
+          </div>
+
+          <div id="ytProbeError" class="hidden p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px]"></div>
+
+          <div>
+            <label class="block text-[11px] text-zinc-400 mb-1">Modo de transferência</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="ytModeVideo" type="button" onclick="setYoutubeMode('video')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer">
+                Vídeo + Áudio
+              </button>
+              <button id="ytModeAudio" type="button" onclick="setYoutubeMode('audio')"
+                class="px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer">
+                Só Áudio
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-zinc-400 mb-1">Formato</label>
+              <select id="ytContainer"
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500">
+                <option value="mp4">MP4 (Universal)</option>
+                <option value="mkv">MKV (Matroska)</option>
+                <option value="webm">WebM (VP9/AV1)</option>
+              </select>
+            </div>
+            <div>
+              <label id="ytQualityLabel" class="block text-[11px] text-zinc-400 mb-1">Qualidade de vídeo</label>
+              <select id="ytQuality"
+                class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500">
+                <option value="best">Melhor disponível</option>
+                <option value="2160">2160p (4K UHD)</option>
+                <option value="1440">1440p (2K QHD)</option>
+                <option value="1080">1080p (Full HD)</option>
+                <option value="720">720p (HD)</option>
+                <option value="480">480p (SD)</option>
+                <option value="360">360p</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div id="tab-batch" class="tab-pane hidden">
@@ -506,6 +576,15 @@
   }
   document.addEventListener("click", closeToolsMenu);
 
+  function isYtUrl(u) {
+    try {
+      const h = new URL(u).hostname.toLowerCase();
+      return /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|music\.youtube\.com)$/.test(h);
+    } catch {
+      return false;
+    }
+  }
+
   // Native desktop paste shortcut: paste URL or cURL anywhere
   document.addEventListener("paste", (ev) => {
     const tag = (ev.target && ev.target.tagName || "").toLowerCase();
@@ -516,8 +595,14 @@
       openAddModal("curl");
       document.getElementById("inCurl").value = text;
     } else if (/^https?:\/\//i.test(text)) {
-      openAddModal("single");
-      document.getElementById("inUrl").value = text;
+      if (isYtUrl(text)) {
+        openAddModal("youtube");
+        document.getElementById("ytUrl").value = text;
+        probeYoutubeUrl();
+      } else {
+        openAddModal("single");
+        document.getElementById("inUrl").value = text;
+      }
     }
   });
 
@@ -889,6 +974,95 @@
     document.querySelectorAll(".tab-pane").forEach(p => p.classList.add("hidden"));
     document.getElementById(`tab-${tab}`).classList.remove("hidden");
   }
+  let ytMode = "video";
+  let ytProbeData = null;
+
+  function setYoutubeMode(mode) {
+    ytMode = mode;
+    const btnV = document.getElementById("ytModeVideo");
+    const btnA = document.getElementById("ytModeAudio");
+    const fmtSel = document.getElementById("ytContainer");
+    const qSel = document.getElementById("ytQuality");
+    const qLbl = document.getElementById("ytQualityLabel");
+
+    if (mode === "audio") {
+      btnA.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer";
+      btnV.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer";
+      qLbl.textContent = "Qualidade de áudio";
+      const aFmts = (ytProbeData && ytProbeData.audio_formats) || [
+        { value: "mp3", label: "MP3 (Áudio universal)" },
+        { value: "m4a", label: "M4A (AAC alta qualidade)" },
+        { value: "opus", label: "Opus (Original / Leve)" },
+      ];
+      fmtSel.innerHTML = aFmts.map(f => `<option value="${esc(f.value)}">${esc(f.label)}</option>`).join("");
+      const aQuals = (ytProbeData && ytProbeData.audio_qualities) || [
+        { value: "320", label: "320 kbps (Alta)" },
+        { value: "192", label: "192 kbps (Média)" },
+        { value: "128", label: "128 kbps (Compacta)" },
+      ];
+      qSel.innerHTML = aQuals.map(q => `<option value="${esc(q.value)}">${esc(q.label)}</option>`).join("");
+    } else {
+      btnV.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer";
+      btnA.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer";
+      qLbl.textContent = "Qualidade de vídeo";
+      const vFmts = (ytProbeData && ytProbeData.video_formats) || [
+        { value: "mp4", label: "MP4 (Universal)" },
+        { value: "mkv", label: "MKV (Matroska)" },
+        { value: "webm", label: "WebM (VP9/AV1)" },
+      ];
+      fmtSel.innerHTML = vFmts.map(f => `<option value="${esc(f.value)}">${esc(f.label)}</option>`).join("");
+      const vQuals = (ytProbeData && ytProbeData.video_qualities) || [
+        { value: "best", label: "Melhor disponível", estimated_size: 0 },
+        { value: "2160", label: "2160p (4K UHD)", estimated_size: 0 },
+        { value: "1440", label: "1440p (2K QHD)", estimated_size: 0 },
+        { value: "1080", label: "1080p (Full HD)", estimated_size: 0 },
+        { value: "720", label: "720p (HD)", estimated_size: 0 },
+        { value: "480", label: "480p (SD)", estimated_size: 0 },
+        { value: "360", label: "360p", estimated_size: 0 },
+      ];
+      qSel.innerHTML = vQuals.map(q => {
+        const sz = q.estimated_size > 0 ? ` · ~${fmtBytes(q.estimated_size)}` : "";
+        return `<option value="${esc(q.value)}">${esc(q.label)}${sz}</option>`;
+      }).join("");
+    }
+  }
+
+  async function probeYoutubeUrl() {
+    const url = (document.getElementById("ytUrl").value || "").trim();
+    if (!url) return;
+    const btn = document.getElementById("ytProbeBtn");
+    const errBox = document.getElementById("ytProbeError");
+    const card = document.getElementById("ytPreviewCard");
+    errBox.classList.add("hidden");
+    btn.disabled = true;
+    btn.textContent = "A analisar...";
+    try {
+      const info = await api("/api/youtube/probe", {
+        method: "POST",
+        body: JSON.stringify({ url }),
+      });
+      ytProbeData = info;
+      document.getElementById("ytTitle").textContent = info.title || "Vídeo YouTube";
+      document.getElementById("ytChannel").textContent =
+        [info.uploader, info.duration_text].filter(Boolean).join(" · ") || "YouTube";
+      const thumb = document.getElementById("ytThumb");
+      if (info.thumbnail) {
+        thumb.src = info.thumbnail;
+        thumb.classList.remove("hidden");
+      } else {
+        thumb.classList.add("hidden");
+      }
+      card.classList.remove("hidden");
+      setYoutubeMode(ytMode);
+    } catch (e) {
+      errBox.textContent = "Não foi possível analisar este link: " + e.message;
+      errBox.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Analisar";
+    }
+  }
+
   async function submitAddModal() {
     try {
       if (addTab === "single") {
@@ -900,6 +1074,24 @@
             max_connections: Number(document.getElementById("inConns").value || 8),
             queue_id: document.getElementById("inQueue").value || "main",
             expected_checksum: document.getElementById("inChecksum").value || "",
+          }),
+        });
+        downloads.set(rec.id, rec);
+        selectDownload(rec.id);
+        renderAll();
+      } else if (addTab === "youtube") {
+        const url = document.getElementById("ytUrl").value.trim();
+        const container = document.getElementById("ytContainer").value;
+        const qual = document.getElementById("ytQuality").value;
+        const rec = await api("/api/downloads/add", {
+          method: "POST",
+          body: JSON.stringify({
+            url,
+            queue_id: ytMode === "video" ? "video" : "main",
+            media_mode: ytMode,
+            container,
+            quality: ytMode === "audio" ? "best" : qual,
+            audio_bitrate: ytMode === "audio" ? qual : "320",
           }),
         });
         downloads.set(rec.id, rec);

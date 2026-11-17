@@ -6,8 +6,33 @@ const connPill = document.getElementById("connPill");
 const quickUrl = document.getElementById("quickUrl");
 const mediaWrap = document.getElementById("mediaWrap");
 const mediaList = document.getElementById("mediaList");
+const ytWrap = document.getElementById("ytWrap");
+const ytPageTitle = document.getElementById("ytPageTitle");
+const ytMode = document.getElementById("ytMode");
+const ytFormat = document.getElementById("ytFormat");
+const ytQuality = document.getElementById("ytQuality");
 
 let activeTabUrl = "";
+
+function isYoutubeUrl(u) {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return /(^|\.)(youtube\.com|youtu\.be|music\.youtube\.com)$/.test(h);
+  } catch {
+    return false;
+  }
+}
+
+function updateYtOptions() {
+  if (ytMode.value === "audio") {
+    ytFormat.innerHTML = `<option value="mp3">MP3</option><option value="m4a">M4A</option><option value="opus">Opus</option>`;
+    ytQuality.innerHTML = `<option value="320">320 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option>`;
+  } else {
+    ytFormat.innerHTML = `<option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WebM</option>`;
+    ytQuality.innerHTML = `<option value="best">Melhor disponível</option><option value="2160">2160p (4K)</option><option value="1080">1080p (Full HD)</option><option value="720">720p (HD)</option><option value="480">480p</option><option value="360">360p</option>`;
+  }
+}
+ytMode.onchange = updateYtOptions;
 
 async function checkServer(baseUrl) {
   const base = (baseUrl || "http://127.0.0.1:8787").trim().replace(/\/$/, "");
@@ -39,6 +64,12 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   const tab = tabs && tabs[0];
   if (!tab) return;
   activeTabUrl = tab.url || "";
+
+  if (isYoutubeUrl(activeTabUrl)) {
+    ytWrap.style.display = "block";
+    ytPageTitle.textContent = tab.title || activeTabUrl;
+  }
+
   chrome.runtime.sendMessage({ type: "getTabMedia", tabId: tab.id }, (res) => {
     const items = (res && res.items) || [];
     if (!items.length) return;
@@ -76,6 +107,28 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     }
   });
 });
+
+document.getElementById("ytDownload").onclick = async () => {
+  const base = (serverInput.value.trim() || "http://127.0.0.1:8787").replace(/\/$/, "");
+  const headers = { "Content-Type": "application/json" };
+  if (keyInput.value.trim()) headers["X-API-Key"] = keyInput.value.trim();
+  const mode = ytMode.value;
+  const body = {
+    url: activeTabUrl,
+    media_mode: mode,
+    container: ytFormat.value,
+    quality: mode === "audio" ? "best" : ytQuality.value,
+    audio_bitrate: mode === "audio" ? ytQuality.value : "320"
+  };
+  try {
+    const r = await fetch(`${base}/api/downloads/add`, { method: "POST", headers, body: JSON.stringify(body) });
+    statusEl.style.color = r.ok ? "#34d399" : "#f87171";
+    statusEl.textContent = r.ok ? "Download do YouTube iniciado no Gennius DM." : "Erro ao iniciar download.";
+  } catch (e) {
+    statusEl.style.color = "#f87171";
+    statusEl.textContent = "GenniusDM.exe não está aberto.";
+  }
+};
 
 document.getElementById("sendQuick").onclick = () => {
   const url = quickUrl.value.trim();

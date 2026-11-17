@@ -13,7 +13,7 @@ hidden_imports = (
     + ["sqlite3", "webbrowser", "zipfile", "bottle", "proxy_tools"]
 )
 
-for pkg in ("webview", "pythonnet", "clr_loader"):
+for pkg in ("webview", "pythonnet", "clr_loader", "yt_dlp", "imageio_ffmpeg"):
     try:
         d, b, h = collect_all(pkg)
         datas += d

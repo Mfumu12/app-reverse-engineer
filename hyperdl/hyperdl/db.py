@@ -66,6 +66,7 @@ class Database:
                 expected_checksum TEXT NOT NULL DEFAULT '',
                 checksum_algorithm TEXT NOT NULL DEFAULT 'sha256',
                 actual_checksum TEXT NOT NULL DEFAULT '',
+                media_options_json TEXT NOT NULL DEFAULT '{}',
                 split_count INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL,
@@ -106,6 +107,9 @@ class Database:
             );
             """
         )
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(downloads)").fetchall()}
+        if "media_options_json" not in cols:
+            self._conn.execute("ALTER TABLE downloads ADD COLUMN media_options_json TEXT NOT NULL DEFAULT '{}'")
         self._conn.commit()
 
     def _seed_defaults(self) -> None:
@@ -291,6 +295,7 @@ class Database:
             expected_checksum=r["expected_checksum"],
             checksum_algorithm=r["checksum_algorithm"],
             actual_checksum=r["actual_checksum"],
+            media_options=json.loads(r["media_options_json"] or "{}") if "media_options_json" in r.keys() else {},
             split_count=r["split_count"],
             created_at=r["created_at"],
             updated_at=r["updated_at"],
@@ -308,9 +313,9 @@ class Database:
                     id, url, final_url, filename, save_dir, file_path, total_size, downloaded_bytes,
                     status, download_type, category, queue_id, max_connections, speed_limit_kbps,
                     supports_range, etag, last_modified, mime_type, headers_json, user_agent,
-                    error_message, expected_checksum, checksum_algorithm, actual_checksum, split_count,
+                    error_message, expected_checksum, checksum_algorithm, actual_checksum, media_options_json, split_count,
                     created_at, updated_at, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     dl.id,
@@ -337,6 +342,7 @@ class Database:
                     dl.expected_checksum,
                     dl.checksum_algorithm,
                     dl.actual_checksum,
+                    json.dumps(dl.media_options),
                     dl.split_count,
                     dl.created_at,
                     dl.updated_at,
@@ -356,7 +362,7 @@ class Database:
                     category = ?, queue_id = ?, max_connections = ?, speed_limit_kbps = ?,
                     supports_range = ?, etag = ?, last_modified = ?, mime_type = ?,
                     headers_json = ?, user_agent = ?, error_message = ?,
-                    expected_checksum = ?, checksum_algorithm = ?, actual_checksum = ?, split_count = ?,
+                    expected_checksum = ?, checksum_algorithm = ?, actual_checksum = ?, media_options_json = ?, split_count = ?,
                     updated_at = ?, completed_at = ?
                 WHERE id = ?
                 """,
@@ -384,6 +390,7 @@ class Database:
                     dl.expected_checksum,
                     dl.checksum_algorithm,
                     dl.actual_checksum,
+                    json.dumps(dl.media_options),
                     dl.split_count,
                     dl.updated_at,
                     dl.completed_at,

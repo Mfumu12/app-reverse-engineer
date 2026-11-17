@@ -7,7 +7,7 @@
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-      width: 320px;
+      width: 330px;
       margin: 0;
       padding: 12px;
       background: #0b0d11;
@@ -50,7 +50,7 @@
       font-weight: 600;
     }
     .quick-row { display: flex; gap: 6px; }
-    input[type="text"] {
+    input[type="text"], select {
       width: 100%;
       padding: 6px 8px;
       border-radius: 5px;
@@ -60,7 +60,7 @@
       font-size: 11.5px;
       outline: none;
     }
-    input[type="text"]:focus { border-color: #2563eb; }
+    input[type="text"]:focus, select:focus { border-color: #2563eb; }
     button {
       padding: 6px 10px;
       border: 1px solid #27272a;
@@ -78,8 +78,18 @@
       color: #fff;
     }
     button.primary:hover { background: #3b82f6; }
+    .yt-card {
+      background: #11141b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .yt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .media-list {
-      max-height: 120px;
+      max-height: 110px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -140,9 +150,38 @@
     <span id="connPill" class="pill">A verificar...</span>
   </div>
 
+  <!-- YouTube Tab Box -->
+  <div id="ytWrap" style="display:none;">
+    <div class="section-title">Vídeo YouTube Detetado</div>
+    <div class="yt-card">
+      <div id="ytPageTitle" style="font-weight:500;color:#f4f4f5;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+      <div class="yt-grid">
+        <select id="ytMode">
+          <option value="video">Vídeo + Áudio</option>
+          <option value="audio">Só Áudio</option>
+        </select>
+        <select id="ytFormat">
+          <option value="mp4">MP4</option>
+          <option value="mkv">MKV</option>
+          <option value="webm">WebM</option>
+        </select>
+      </div>
+      <div class="quick-row">
+        <select id="ytQuality" style="flex:1;">
+          <option value="best">Melhor disponível</option>
+          <option value="1080">1080p (Full HD)</option>
+          <option value="720">720p (HD)</option>
+          <option value="480">480p</option>
+          <option value="360">360p</option>
+        </select>
+        <button id="ytDownload" class="primary">Baixar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="section-title">Envio Rápido</div>
   <div class="quick-row">
-    <input id="quickUrl" type="text" placeholder="Cola um URL ou .m3u8..." />
+    <input id="quickUrl" type="text" placeholder="Cola um URL, YouTube ou .m3u8..." />
     <button id="sendQuick" class="primary">Enviar</button>
   </div>
 

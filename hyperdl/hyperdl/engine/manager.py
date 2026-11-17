@@ -13,14 +13,15 @@ import aiohttp
 
 from ..config import HyperDLConfig
 from ..db import Database
-from ..models import DownloadRecord, DownloadStatus, DownloadType, QueueRecord, detect_category
+from ..models import Category, DownloadRecord, DownloadStatus, DownloadType, QueueRecord, detect_category
 from ..utils.checksum import compute_checksum
 from ..utils.filename import extract_filename, part_file_path, resolve_unique_path
 from .hls_engine import HlsDownloadJob
 from .http_engine import HttpDownloadJob
 from .throttle import TokenBucketLimiter
+from .youtube_engine import YoutubeDownloadJob, is_youtube_url
 
-ActiveJob = HttpDownloadJob | HlsDownloadJob
+ActiveJob = HttpDownloadJob | HlsDownloadJob | YoutubeDownloadJob
 
 
 class DownloadManager:
@@ -135,6 +136,7 @@ class DownloadManager:
         download_type: str | None = None,
         expected_checksum: str = "",
         checksum_algorithm: str = "sha256",
+        media_options: dict[str, Any] | None = None,
         auto_start: bool = True,
     ) -> DownloadRecord:
         url = url.strip()
@@ -144,7 +146,12 @@ class DownloadManager:
         dl_type = download_type
         if not dl_type:
             path_part = urlparse(url).path.lower()
-            dl_type = DownloadType.HLS.value if path_part.endswith(".m3u8") else DownloadType.HTTP.value
+            if is_youtube_url(url) or (media_options and media_options.get("media_mode")):
+                dl_type = DownloadType.YOUTUBE.value
+            elif path_part.endswith(".m3u8"):
+                dl_type = DownloadType.HLS.value
+            else:
+                dl_type = DownloadType.HTTP.value
 
         host = (urlparse(url).hostname or "").lower()
         host_cfg = self.db.get_host_settings(host) if host else None
@@ -165,12 +172,20 @@ class DownloadManager:
         initial_name = extract_filename(url, suggested_name=filename)
         if dl_type == DownloadType.HLS.value and initial_name.lower().endswith(".m3u8"):
             initial_name = initial_name[:-5] + ".ts"
+        if dl_type == DownloadType.YOUTUBE.value and not filename:
+            yt_opts = media_options or {}
+            ext = str(yt_opts.get("container") or ("mp3" if yt_opts.get("media_mode") == "audio" else "mp4")).lower()
+            initial_name = f"youtube_media.{ext}"
         target_path = resolve_unique_path(target_dir, initial_name)
 
         if not self.db.get_queue(queue_id):
             queue_id = "main"
 
         now = time.time()
+        yt_cat = detect_category(target_path.name, "", dl_type)
+        if dl_type == DownloadType.YOUTUBE.value:
+            yt_cat = Category.MUSIC.value if (media_options or {}).get("media_mode") == "audio" else Category.VIDEO.value
+
         rec = DownloadRecord(
             id=uuid.uuid4().hex[:12],
             url=url,
@@ -182,7 +197,7 @@ class DownloadManager:
             downloaded_bytes=0,
             status=DownloadStatus.QUEUED.value if auto_start else DownloadStatus.PAUSED.value,
             download_type=dl_type,
-            category=detect_category(target_path.name, "", dl_type),
+            category=yt_cat,
             queue_id=queue_id,
             max_connections=effective_conns,
             speed_limit_kbps=max(0, int(effective_limit)),
@@ -194,6 +209,7 @@ class DownloadManager:
             user_agent=effective_ua,
             expected_checksum=expected_checksum.strip(),
             checksum_algorithm=checksum_algorithm.strip().lower() or "sha256",
+            media_options=dict(media_options or {}),
             created_at=now,
             updated_at=now,
         )
@@ -233,8 +249,12 @@ class DownloadManager:
         assert self._session is not None
         if rec.id in self._tasks:
             return
-        if rec.download_type == DownloadType.HLS.value:
-            job: ActiveJob = HlsDownloadJob(
+        if rec.download_type == DownloadType.YOUTUBE.value:
+            job: ActiveJob = YoutubeDownloadJob(
+                rec, self.db, self.config, self._session, self.global_limiter, on_update=self._on_job_update
+            )
+        elif rec.download_type == DownloadType.HLS.value:
+            job = HlsDownloadJob(
                 rec, self.db, self.config, self._session, self.global_limiter, on_update=self._on_job_update
             )
         else:

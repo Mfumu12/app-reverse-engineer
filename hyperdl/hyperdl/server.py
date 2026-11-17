@@ -20,6 +20,7 @@ from . import __version__
 from .browser_installer import detect_browsers, get_installed_extension_dir, install_extension_for_browser, sync_extension_files
 from .config import HyperDLConfig
 from .engine.manager import DownloadManager
+from .engine.youtube_engine import probe_youtube
 from .utils.importers import expand_wildcard_url, extract_urls_from_text, parse_curl_command
 
 
@@ -154,6 +155,7 @@ class HyperDLServer:
         app.router.add_get("/api/extension.zip", self.handle_extension_zip)
         app.router.add_get("/api/extension/status", self.handle_extension_status)
         app.router.add_post("/api/extension/install", self.handle_extension_install)
+        app.router.add_post("/api/youtube/probe", self.handle_youtube_probe)
 
         # Built-in Range & HLS Benchmark/Demo endpoints
         app.router.add_post("/api/demo/start", self.handle_demo_start)
@@ -225,6 +227,14 @@ class HyperDLServer:
         if not url:
             raise web.HTTPBadRequest(text=json.dumps({"error": "url is required"}), content_type="application/json")
         try:
+            media_options = data.get("media_options")
+            if not media_options and any(k in data for k in ("media_mode", "quality", "container", "audio_bitrate")):
+                media_options = {
+                    "media_mode": data.get("media_mode", "video"),
+                    "quality": data.get("quality", "best"),
+                    "container": data.get("container", "mp4"),
+                    "audio_bitrate": data.get("audio_bitrate", "320"),
+                }
             rec = await self.manager.add_download(
                 url,
                 filename=data.get("filename"),
@@ -237,6 +247,7 @@ class HyperDLServer:
                 download_type=data.get("download_type"),
                 expected_checksum=data.get("expected_checksum", ""),
                 checksum_algorithm=data.get("checksum_algorithm", "sha256"),
+                media_options=media_options,
                 auto_start=bool(data.get("auto_start", True)),
             )
             return web.json_response(rec.to_dict(include_segments=True), status=201)
@@ -446,6 +457,18 @@ class HyperDLServer:
         mode = str(data.get("mode", "launch"))
         result = install_extension_for_browser(EXT_DIR, browser_id=browser_id, mode=mode)
         return web.json_response(result)
+
+    async def handle_youtube_probe(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        data = await request.json() if request.can_read_body else {}
+        url = str(data.get("url", "")).strip()
+        if not url.startswith(("http://", "https://")):
+            raise web.HTTPBadRequest(text=json.dumps({"error": "URL inválida"}), content_type="application/json")
+        try:
+            info = await probe_youtube(url)
+            return web.json_response(info)
+        except Exception as exc:
+            raise web.HTTPBadRequest(text=json.dumps({"error": str(exc)}), content_type="application/json")
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 

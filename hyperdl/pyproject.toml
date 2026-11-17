@@ -5,6 +5,8 @@ description = "Hybrid multi-segment HTTP & HLS download accelerator combining ID
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.9",
+    "yt-dlp>=2024.10",
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.optional-dependencies]
