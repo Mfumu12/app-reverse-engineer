@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font-family: system-ui, sans-serif; width: 270px; margin: 0; padding: 14px; background: #0f172a; color: #e2e8f0; }
+  h3 { margin: 0 0 10px; font-size: 15px; color: #38bdf8; }
+  label { display: block; font-size: 12px; color: #94a3b8; margin-top: 8px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+  button { margin-top: 12px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #0284c7; color: #fff; font-weight: 600; cursor: pointer; }
+  #status { margin-top: 8px; font-size: 12px; color: #4ade80; }
+</style>
+</head>
+<body>
+  <h3>HyperDL Extension</h3>
+  <label>Server URL
+    <input id="serverUrl" type="text" value="http://127.0.0.1:8787" />
+  </label>
+  <label>API Key (optional)
+    <input id="apiKey" type="text" placeholder="Optional" />
+  </label>
+  <div class="row">
+    <input id="autoCapture" type="checkbox" />
+    <span>Auto-intercept browser downloads</span>
+  </div>
+  <button id="save">Save &amp; Test Connection</button>
+  <div id="status"></div>
+  <script>
+    const serverInput = document.getElementById("serverUrl");
+    const keyInput = document.getElementById("apiKey");
+    const capInput = document.getElementById("autoCapture");
+    const statusEl = document.getElementById("status");
+    chrome.storage.local.get({ serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: false }, (res) => {
+      serverInput.value = res.serverUrl;
+      keyInput.value = res.apiKey;
+      capInput.checked = res.autoCapture;
+    });
+    document.getElementById("save").onclick = async () => {
+      const serverUrl = serverInput.value.trim();
+      const apiKey = keyInput.value.trim();
+      const autoCapture = capInput.checked;
+      await chrome.storage.local.set({ serverUrl, apiKey, autoCapture });
+      try {
+        const r = await fetch(`${serverUrl.replace(/\/$/, "")}/api/ping`);
+        const j = await r.json();
+        statusEl.style.color = "#4ade80";
+        statusEl.textContent = `Connected: ${j.app} v${j.version}`;
+      } catch (e) {
+        statusEl.style.color = "#f87171";
+        statusEl.textContent = "Cannot reach HyperDL server";
+      }
+    };
+  </script>
+</body>
+</html>

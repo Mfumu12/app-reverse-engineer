@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HyperDL — Acelerador de Downloads Híbrido (IDM + ABD)</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #11182c;
+    --panel-2: #17213b;
+    --border: #243152;
+    --text: #e6edf7;
+    --muted: #8ea0c0;
+    --accent: #38bdf8;
+    --accent-2: #6366f1;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    height: 58px; background: var(--panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 18px; gap: 12px;
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .brand-badge {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 700;
+  }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button, select, input, textarea {
+    font-family: inherit; font-size: 13px; color: var(--text);
+  }
+  .btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px; transition: .15s;
+  }
+  .btn:hover { border-color: var(--accent); background: #1c2949; }
+  .btn-primary {
+    background: linear-gradient(135deg, #0284c7, #4f46e5); border-color: transparent; color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+  .btn-danger { color: #fca5a5; }
+  .btn-danger:hover { border-color: var(--red); background: rgba(239,68,68,.15); }
+
+  .layout { display: flex; flex: 1; min-height: 0; }
+  aside {
+    width: 245px; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 14px 10px; overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;
+  }
+  .side-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+    padding: 0 10px; margin-bottom: 6px; font-weight: 700;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between; padding: 7px 10px;
+    border-radius: 8px; cursor: pointer; font-size: 13px; color: #cbd5e1; transition: .12s;
+  }
+  .nav-item:hover { background: var(--panel-2); color: #fff; }
+  .nav-item.active { background: rgba(56,189,248,.16); color: var(--accent); font-weight: 600; }
+  .pill { font-size: 11px; background: var(--panel-2); padding: 1px 7px; border-radius: 999px; color: var(--muted); }
+  .queue-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 6px 10px;
+    border-radius: 8px; font-size: 12.5px; cursor: pointer;
+  }
+  .queue-row:hover { background: var(--panel-2); }
+  .queue-row.active { background: rgba(99,102,241,.2); color: #a5b4fc; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot-on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot-off { background: var(--muted); }
+
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .stats-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 18px; background: rgba(17,24,44,.65); border-bottom: 1px solid var(--border);
+    font-size: 12.5px; flex-wrap: wrap;
+  }
+  .stats-group { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .stat b { color: var(--accent); }
+  .search-input {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; width: 220px; outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  .table-wrap { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--border);
+    text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 600; font-size: 12px; z-index: 1;
+  }
+  tbody tr { border-bottom: 1px solid rgba(36,49,82,.55); cursor: pointer; transition: .1s; }
+  tbody tr:hover { background: rgba(56,189,248,.06); }
+  tbody tr.selected { background: rgba(56,189,248,.13); }
+  td { padding: 9px 12px; vertical-align: middle; }
+  .fname { font-weight: 600; color: #f8fafc; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .furl { font-size: 11px; color: var(--muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .st-downloading { background: rgba(56,189,248,.18); color: var(--accent); }
+  .st-completed { background: rgba(34,197,94,.18); color: var(--green); }
+  .st-paused { background: rgba(245,158,11,.18); color: var(--amber); }
+  .st-queued, .st-probing, .st-assembling { background: rgba(99,102,241,.2); color: #a5b4fc; }
+  .st-error, .st-cancelled { background: rgba(239,68,68,.18); color: #fca5a5; }
+  .prog-track { width: 130px; height: 8px; background: #1e293b; border-radius: 999px; overflow: hidden; }
+  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width .15s; }
+
+  /* Inspector Drawer */
+  .inspector {
+    height: 270px; background: var(--panel); border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .inspector.hidden { display: none; }
+  .insp-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 8px 16px;
+    border-bottom: 1px solid var(--border); background: var(--panel-2); font-size: 13px;
+  }
+  .insp-body { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; padding: 12px 16px; overflow: auto; flex: 1; }
+  .seg-map {
+    display: flex; width: 100%; height: 22px; background: #0f172a; border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; margin: 6px 0 10px;
+  }
+  .seg-block { height: 100%; border-right: 1px solid #0b1020; position: relative; background: #1e293b; }
+  .seg-block-fill { height: 100%; transition: width .15s; }
+  .seg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .seg-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 11.5px;
+  }
+  canvas#speedChart { width: 100%; height: 76px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(2,6,23,.72); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    width: 100%; max-width: 560px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  .modal-head {
+    display: flex; justify-content: space-between; align-items: center; padding: 14px 18px;
+    border-bottom: 1px solid var(--border); font-weight: 700;
+  }
+  .modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .tab {
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 12.5px; background: transparent;
+    border: 1px solid transparent; color: var(--muted);
+  }
+  .tab.active { background: rgba(56,189,248,.16); color: var(--accent); border-color: rgba(56,189,248,.35); font-weight: 600; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+  @media (max-width: 900px) {
+    aside { display: none; }
+    .insp-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span>⚡ HyperDL</span>
+    <span class="brand-badge">IDM + ABD Engine</span>
+    <span id="connBadge" class="pill" style="font-size:11px;">⏳ A ligar...</span>
+  </div>
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openAddModal()">+ Novo Download</button>
+    <button class="btn" onclick="runDemoHttp()" title="Testa 8 conexões dinâmicas + work-stealing">🚀 Demo HTTP 16MB</button>
+    <button class="btn" onclick="runDemoHls()" title="Testa stream HLS .m3u8 multi-segmento">🎬 Demo HLS (.m3u8)</button>
+    <button class="btn" onclick="runDemoGithub()" title="Testa download real do GitHub (internet)">🌐 Demo GitHub</button>
+    <select id="speedSelect" class="btn" onchange="changeGlobalSpeed(this.value)" title="Limitador global de velocidade">
+      <option value="0">Velocidade: Ilimitada</option>
+      <option value="512">Limite: 512 KB/s</option>
+      <option value="1024">Limite: 1 MB/s</option>
+      <option value="2048">Limite: 2 MB/s</option>
+      <option value="5120">Limite: 5 MB/s</option>
+    </select>
+    <a class="btn" href="/api/extension.zip" download>🧩 Extensão Browser</a>
+    <button class="btn" onclick="openSettingsModal()">⚙ Config</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div>
+      <div class="side-title">Estado</div>
+      <div class="nav-item active" data-filter-type="all" onclick="setFilter('all', '')"><span>Todos</span><span class="pill" id="cnt-all">0</span></div>
+      <div class="nav-item" data-filter-type="status" data-filter-val="downloading" onclick="setFilter('status', 'downloading')"><span>A descarregar</span><span class="pill" id="cnt-downloading">0</span></div>
+      <div class="nav-item" data-filter-type="status" data-filter-val="completed" onclick="setFilter('status', 'completed')"><span>Concluídos</span><span class="pill" id="cnt-completed">0</span></div>
+      <div class="nav-item" data-filter-type="status" data-filter-val="paused" onclick="setFilter('status', 'paused')"><span>Pausados</span><span class="pill" id="cnt-paused">0</span></div>
+      <div class="nav-item" data-filter-type="status" data-filter-val="error" onclick="setFilter('status', 'error')"><span>Erros</span><span class="pill" id="cnt-error">0</span></div>
+    </div>
+    <div>
+      <div class="side-title">Categorias</div>
+      <div class="nav-item" data-filter-type="category" data-filter-val="video" onclick="setFilter('category', 'video')"><span>🎬 Vídeo &amp; HLS</span><span class="pill" id="cnt-cat-video">0</span></div>
+      <div class="nav-item" data-filter-type="category" data-filter-val="compressed" onclick="setFilter('category', 'compressed')"><span>🗜 Comprimidos</span><span class="pill" id="cnt-cat-compressed">0</span></div>
+      <div class="nav-item" data-filter-type="category" data-filter-val="programs" onclick="setFilter('category', 'programs')"><span>⚙ Programas</span><span class="pill" id="cnt-cat-programs">0</span></div>
+      <div class="nav-item" data-filter-type="category" data-filter-val="documents" onclick="setFilter('category', 'documents')"><span>📄 Documentos</span><span class="pill" id="cnt-cat-documents">0</span></div>
+      <div class="nav-item" data-filter-type="category" data-filter-val="music" onclick="setFilter('category', 'music')"><span>🎵 Música</span><span class="pill" id="cnt-cat-music">0</span></div>
+    </div>
+    <div>
+      <div class="side-title">Filas (Queues)</div>
+      <div id="queuesList"></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="stats-bar">
+      <div class="stats-group">
+        <span class="stat">Velocidade Total: <b id="totalSpeed">0 B/s</b></span>
+        <span class="stat">Ativos: <b id="activeCount">0</b></span>
+        <span class="stat">Conexões TCP: <b id="totalConns">0</b></span>
+        <span class="stat">Divisões Dinâmicas (Splits): <b id="totalSplits">0</b></span>
+      </div>
+      <input class="search-input" id="searchInput" placeholder="Filtrar por nome ou URL..." oninput="renderTable()" />
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ficheiro</th>
+            <th>Tamanho</th>
+            <th>Progresso</th>
+            <th>Velocidade</th>
+            <th>Conns</th>
+            <th>ETA</th>
+            <th>Estado</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="downloadsBody"></tbody>
+      </table>
+      <div id="emptyState" class="empty">
+        Sem downloads ainda. Clica em <b>+ Novo Download</b> ou em <b>🚀 Demo HTTP 16MB</b> para ver o motor multi-segmento em ação!
+      </div>
+    </div>
+
+    <div class="inspector hidden" id="inspector">
+      <div class="insp-head">
+        <div>
+          <strong id="inspTitle">Download</strong>
+          <span id="inspMeta" style="color:var(--muted); margin-left:10px; font-size:12px;"></span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn btn-sm" id="inspVerifyBtn" onclick="verifySelected()">🔐 Verificar SHA-256</button>
+          <button class="btn btn-sm" onclick="closeInspector()">✕</button>
+        </div>
+      </div>
+      <div class="insp-body">
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted);">
+            <span>Mapa de Segmentos (Work-Stealing Dinâmico estilo IDM)</span>
+            <span id="inspSplitBadge"></span>
+          </div>
+          <div class="seg-map" id="segMap"></div>
+          <div class="seg-grid" id="segGrid"></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:12px; color:var(--muted); display:flex; justify-content:space-between;">
+            <span>Throughput em Tempo Real</span>
+            <span id="inspSpeedNow" style="color:var(--accent); font-weight:600;"></span>
+          </div>
+          <canvas id="speedChart" width="380" height="76"></canvas>
+          <div id="inspDetails" style="font-size:12px; color:var(--muted); line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Download Modal -->
+<div class="modal-backdrop" id="addModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span>Adicionar Download</span>
+      <button class="btn btn-sm" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <button class="tab active" onclick="switchAddTab('single', this)">URL Direta / HLS</button>
+        <button class="tab" onclick="switchAddTab('curl', this)">Importar cURL</button>
+        <button class="tab" onclick="switchAddTab('batch', this)">Lote / Wildcard</button>
+      </div>
+
+      <div id="tab-single" class="tab-pane">
+        <div class="field">
+          <label>URL (HTTP/HTTPS ou .m3u8)</label>
+          <input id="inUrl" type="url" placeholder="https://exemplo.com/arquivo.zip" />
+        </div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>Nome do ficheiro (opcional)</label>
+            <input id="inFilename" type="text" placeholder="Auto-detetar" />
+          </div>
+          <div class="field">
+            <label>Conexões (1–32)</label>
+            <input id="inConns" type="number" min="1" max="32" value="8" />
+          </div>
+        </div>
+        <div class="row2" style="margin-top:8px;">
+          <div class="field">
+            <label>Fila (Queue)</label>
+            <select id="inQueue"></select>
+          </div>
+          <div class="field">
+            <label>SHA-256 esperado (opcional)</label>
+            <input id="inChecksum" type="text" placeholder="Opcional" />
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-curl" class="tab-pane" style="display:none;">
+        <div class="field">
+          <label>Cola o comando cURL (copiado do Chrome/Edge DevTools)</label>
+          <textarea id="inCurl" rows="5" placeholder="curl 'https://...' -H 'Cookie: ...' -H 'User-Agent: ...'"></textarea>
+        </div>
+      </div>
+
+      <div id="tab-batch" class="tab-pane" style="display:none;">
+        <div class="field">
+          <label>Padrão Wildcard (ex: <code>https://host/part_[01..10].zip</code>) ou várias URLs</label>
+          <textarea id="inBatch" rows="5" placeholder="https://exemplo.com/arquivos/parte_[01..08].bin"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
+        <button class="btn" onclick="closeAddModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="submitAddModal()">Iniciar Download</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span>Configurações HyperDL</span>
+      <button class="btn btn-sm" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Pasta de Downloads</label>
+        <input id="setDir" type="text" />
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Conexões padrão por download</label>
+          <input id="setConns" type="number" min="1" max="32" />
+        </div>
+        <div class="field">
+          <label>Limite global (KB/s, 0 = ilimitado)</label>
+          <input id="setLimit" type="number" min="0" />
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn" onclick="closeSettingsModal()">Fechar</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let downloads = new Map();
+  let queues = [];
+  let settings = {};
+  let filter = { type: "all", value: "" };
+  let selectedId = null;
+  let addTab = "single";
+  let speedHistory = [];
+  let wsConnected = false;
+
+  function setConnBadge(text, color) {
+    const b = document.getElementById("connBadge");
+    if (!b) return;
+    b.textContent = text;
+    b.style.color = color || "var(--muted)";
+  }
+
+  function fmtBytes(n) {
+    if (n === null || n === undefined || n < 0) return "Desconhecido";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    let v = Number(n);
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
+  }
+  function fmtEta(s) {
+    if (s === null || s === undefined || !isFinite(s)) return "—";
+    s = Math.max(0, Math.round(s));
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  }
+  function esc(str) {
+    return String(str ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  async function loadSnapshot() {
+    try {
+      const [dlRes, qRes, sRes] = await Promise.all([
+        api("/api/downloads?segments=true"),
+        api("/api/queues"),
+        api("/api/settings"),
+      ]);
+      downloads.clear();
+      for (const d of dlRes.downloads || []) downloads.set(d.id, d);
+      queues = qRes.queues || [];
+      settings = sRes || {};
+      syncSettingsUI();
+      renderAll();
+      if (!wsConnected) setConnBadge("🟡 HTTP Ativo", "var(--amber)");
+    } catch (e) {
+      setConnBadge("🔴 Desligado", "var(--red)");
+    }
+  }
+
+  function connectWS() {
+    try {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.host}/api/ws`);
+      ws.onopen = () => {
+        wsConnected = true;
+        setConnBadge("🟢 Tempo Real", "var(--green)");
+      };
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.event === "snapshot") {
+          downloads.clear();
+          for (const d of msg.data.downloads) downloads.set(d.id, d);
+          queues = msg.data.queues || [];
+          settings = msg.data.settings || {};
+          syncSettingsUI();
+          renderAll();
+        } else if (msg.event === "download_added") {
+          downloads.set(msg.data.id, msg.data);
+          renderAll();
+        } else if (msg.event === "downloads_batch_update") {
+          for (const d of msg.data) downloads.set(d.id, d);
+          renderAll();
+        } else if (msg.event === "download_update") {
+          downloads.set(msg.data.id, msg.data);
+          renderAll();
+        } else if (msg.event === "download_removed") {
+          downloads.delete(msg.data.id);
+          if (selectedId === msg.data.id) closeInspector();
+          renderAll();
+        } else if (msg.event === "settings_update") {
+          settings = msg.data;
+          syncSettingsUI();
+        }
+      };
+      ws.onerror = () => {
+        wsConnected = false;
+      };
+      ws.onclose = () => {
+        wsConnected = false;
+        setConnBadge("🟡 HTTP Polling", "var(--amber)");
+        setTimeout(connectWS, 2000);
+      };
+    } catch (e) {
+      wsConnected = false;
+    }
+  }
+
+  setInterval(() => {
+    const hasActive = [...downloads.values()].some(d => ["downloading", "probing", "assembling", "queued"].includes(d.status));
+    if (!wsConnected && (hasActive || downloads.size > 0)) {
+      loadSnapshot();
+    }
+  }, 500);
+
+  function syncSettingsUI() {
+    const sel = document.getElementById("speedSelect");
+    const v = String(settings.global_speed_limit_kbps || 0);
+    if ([...sel.options].some(o => o.value === v)) sel.value = v;
+  }
+
+  function setFilter(type, value) {
+    filter = { type, value };
+    document.querySelectorAll(".nav-item, .queue-row").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(`[data-filter-type="${type}"][data-filter-val="${value}"]`).forEach(el => el.classList.add("active"));
+    if (type === "all") document.querySelector(`[data-filter-type="all"]`).classList.add("active");
+    renderTable();
+  }
+
+  function renderAll() {
+    renderSidebarCounts();
+    renderQueues();
+    renderStats();
+    renderTable();
+    renderInspector();
+  }
+
+  function renderSidebarCounts() {
+    const all = [...downloads.values()];
+    document.getElementById("cnt-all").textContent = all.length;
+    for (const st of ["downloading", "completed", "paused", "error"]) {
+      document.getElementById(`cnt-${st}`).textContent = all.filter(d => d.status === st).length;
+    }
+    for (const cat of ["video", "compressed", "programs", "documents", "music"]) {
+      document.getElementById(`cnt-cat-${cat}`).textContent = all.filter(d => d.category === cat).length;
+    }
+  }
+
+  function renderQueues() {
+    const el = document.getElementById("queuesList");
+    const sel = document.getElementById("inQueue");
+    const prevSel = sel.value;
+    el.innerHTML = queues.map(q => {
+      const isAct = filter.type === "queue" && filter.value === q.id;
+      return `<div class="queue-row ${isAct ? 'active' : ''}" data-filter-type="queue" data-filter-val="${esc(q.id)}" onclick="setFilter('queue','${esc(q.id)}')">
+        <span><span class="dot ${q.is_running ? 'dot-on' : 'dot-off'}"></span>${esc(q.name)}</span>
+        <button class="btn btn-sm" onclick="event.stopPropagation(); toggleQueue('${esc(q.id)}', ${q.is_running})">${q.is_running ? '⏸' : '▶'}</button>
+      </div>`;
+    }).join("");
+    sel.innerHTML = queues.map(q => `<option value="${esc(q.id)}">${esc(q.name)}</option>`).join("");
+    if (prevSel) sel.value = prevSel;
+  }
+
+  function renderStats() {
+    const all = [...downloads.values()];
+    const active = all.filter(d => ["downloading", "probing", "assembling"].includes(d.status));
+    const speed = active.reduce((a, d) => a + (d.speed_bps || 0), 0);
+    const conns = active.reduce((a, d) => a + (d.active_connections || 0), 0);
+    const splits = all.reduce((a, d) => a + (d.split_count || 0), 0);
+    document.getElementById("totalSpeed").textContent = fmtBytes(speed) + "/s";
+    document.getElementById("activeCount").textContent = active.length;
+    document.getElementById("totalConns").textContent = conns;
+    document.getElementById("totalSplits").textContent = splits;
+
+    if (selectedId && downloads.has(selectedId)) {
+      const d = downloads.get(selectedId);
+      speedHistory.push(d.speed_bps || 0);
+      if (speedHistory.length > 50) speedHistory.shift();
+    }
+  }
+
+  function renderTable() {
+    const q = (document.getElementById("searchInput").value || "").toLowerCase();
+    const list = [...downloads.values()]
+      .filter(d => {
+        if (filter.type === "status" && d.status !== filter.value) return false;
+        if (filter.type === "category" && d.category !== filter.value) return false;
+        if (filter.type === "queue" && d.queue_id !== filter.value) return false;
+        if (q && !d.filename.toLowerCase().includes(q) && !d.url.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => b.created_at - a.created_at);
+
+    const body = document.getElementById("downloadsBody");
+    document.getElementById("emptyState").style.display = list.length ? "none" : "block";
+    body.innerHTML = list.map(d => {
+      const pct = d.progress || 0;
+      const isActive = ["downloading", "probing", "assembling", "queued"].includes(d.status);
+      return `<tr class="${selectedId === d.id ? 'selected' : ''}" onclick="selectDownload('${esc(d.id)}')">
+        <td>
+          <div class="fname" title="${esc(d.filename)}">${esc(d.filename)}</div>
+          <div class="furl" title="${esc(d.url)}">${esc(d.download_type.toUpperCase())} • ${esc(d.url)}</div>
+          ${d.error_message ? `<div style="font-size:11px;color:#fca5a5;margin-top:2px;">⚠ ${esc(d.error_message)}</div>` : ''}
+        </td>
+        <td>${fmtBytes(d.downloaded_bytes)} / ${fmtBytes(d.total_size)}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+            <span style="font-size:12px; width:46px;">${pct.toFixed(1)}%</span>
+          </div>
+        </td>
+        <td>${d.status === 'downloading' ? fmtBytes(d.speed_bps) + '/s' : '—'}</td>
+        <td>${d.active_connections || 0}/${d.max_connections}${d.split_count ? ` <span style="color:var(--cyan);font-size:11px;">(+${d.split_count})</span>` : ''}</td>
+        <td>${d.status === 'downloading' ? fmtEta(d.eta_seconds) : '—'}</td>
+        <td><span class="badge st-${esc(d.status)}">${esc(d.status)}</span></td>
+        <td onclick="event.stopPropagation()" style="white-space:nowrap;">
+          ${isActive
+            ? `<button class="btn btn-sm" onclick="pauseDl('${esc(d.id)}')" title="Pausar">⏸</button>`
+            : (d.status !== 'completed' ? `<button class="btn btn-sm" onclick="resumeDl('${esc(d.id)}')" title="Retomar">▶</button>` : '')}
+          ${d.status === 'completed' ? `<a class="btn btn-sm" href="/api/downloads/${esc(d.id)}/file" title="Baixar ficheiro">⬇</a>` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteDl('${esc(d.id)}')" title="Remover">🗑</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  function selectDownload(id) {
+    if (selectedId !== id) speedHistory = [];
+    selectedId = id;
+    document.getElementById("inspector").classList.remove("hidden");
+    renderTable();
+    renderInspector();
+  }
+  function closeInspector() {
+    selectedId = null;
+    document.getElementById("inspector").classList.add("hidden");
+    renderTable();
+  }
+
+  function renderInspector() {
+    if (!selectedId || !downloads.has(selectedId)) return;
+    const d = downloads.get(selectedId);
+    document.getElementById("inspTitle").textContent = d.filename;
+    document.getElementById("inspMeta").textContent = `${d.download_type.toUpperCase()} • Range: ${d.supports_range ? 'Sim' : 'Não'} • ETag: ${d.etag || '—'}`;
+    document.getElementById("inspSplitBadge").textContent = `${(d.segments || []).length} segmentos (${d.split_count || 0} splits dinâmicos)`;
+    document.getElementById("inspSpeedNow").textContent = fmtBytes(d.speed_bps) + "/s";
+    document.getElementById("inspVerifyBtn").style.display = d.status === "completed" ? "inline-flex" : "none";
+
+    const segs = d.segments || [];
+    const total = d.total_size > 0 ? d.total_size : segs.reduce((a, s) => a + Math.max(1, s.total_bytes || s.downloaded_bytes), 0);
+    document.getElementById("segMap").innerHTML = segs.map(s => {
+      const segTotal = d.download_type === 'hls' ? 1 : Math.max(1, s.total_bytes || 1);
+      const widthPct = d.download_type === 'hls' ? (100 / Math.max(1, segs.length)) : (segTotal / Math.max(1, total)) * 100;
+      const fillPct = s.status === 'completed' ? 100 : (d.download_type === 'hls' ? (s.status === 'downloading' ? 50 : 0) : Math.min(100, (s.downloaded_bytes / segTotal) * 100));
+      const color = s.status === 'completed' ? 'var(--green)' : s.status === 'downloading' ? 'var(--accent)' : s.status === 'error' ? 'var(--red)' : 'var(--amber)';
+      return `<div class="seg-block" style="width:${widthPct}%" title="Seg #${s.segment_index}: ${s.status} (${fillPct.toFixed(0)}%)">
+        <div class="seg-block-fill" style="width:${fillPct}%; background:${color}"></div>
+      </div>`;
+    }).join("");
+
+    document.getElementById("segGrid").innerHTML = segs.slice(0, 24).map(s => {
+      const pct = s.status === 'completed' ? 100 : (s.total_bytes > 0 ? Math.min(100, (s.downloaded_bytes / s.total_bytes) * 100) : 0);
+      return `<div class="seg-card">
+        <div style="display:flex; justify-content:space-between;">
+          <b>#${s.segment_index}</b>
+          <span style="color:var(--accent);">${s.status === 'downloading' ? fmtBytes(s.speed_bps) + '/s' : s.status}</span>
+        </div>
+        <div style="color:var(--muted); margin-top:2px;">${fmtBytes(s.downloaded_bytes)}${s.total_bytes > 0 ? ' / ' + fmtBytes(s.total_bytes) : ''} (${pct.toFixed(0)}%)</div>
+      </div>`;
+    }).join("");
+
+    let info = `<b>Caminho:</b> ${esc(d.file_path)}<br/>`;
+    if (d.actual_checksum) info += `<b>${esc((d.checksum_algorithm || 'sha256').toUpperCase())}:</b> <code>${esc(d.actual_checksum)}</code><br/>`;
+    if (d.error_message) info += `<span style="color:#fca5a5;"><b>Erro:</b> ${esc(d.error_message)}</span>`;
+    document.getElementById("inspDetails").innerHTML = info;
+
+    drawSpeedChart();
+  }
+
+  function drawSpeedChart() {
+    const canvas = document.getElementById("speedChart");
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    if (speedHistory.length < 2) return;
+    const maxV = Math.max(1024, ...speedHistory);
+    ctx.beginPath();
+    speedHistory.forEach((v, i) => {
+      const x = (i / (speedHistory.length - 1)) * w;
+      const y = h - 6 - (v / maxV) * (h - 14);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = "rgba(56,189,248,0.16)";
+    ctx.fill();
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...opts,
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t);
+    }
+    return res.json();
+  }
+
+  async function pauseDl(id) { await api(`/api/downloads/${id}/pause`, { method: "POST" }); }
+  async function resumeDl(id) { await api(`/api/downloads/${id}/resume`, { method: "POST" }); }
+  async function deleteDl(id) { await api(`/api/downloads/${id}?delete_file=true`, { method: "DELETE" }); }
+  async function toggleQueue(id, running) {
+    await api(`/api/queues/${id}/${running ? 'stop' : 'start'}`, { method: "POST" });
+    const q = await api("/api/queues");
+    queues = q.queues;
+    renderQueues();
+  }
+  async function changeGlobalSpeed(kbps) {
+    await api("/api/settings", { method: "PUT", body: JSON.stringify({ global_speed_limit_kbps: Number(kbps) }) });
+  }
+  async function verifySelected() {
+    if (!selectedId) return;
+    await api(`/api/downloads/${selectedId}/verify`, { method: "POST", body: JSON.stringify({ algorithm: "sha256" }) });
+  }
+  async function runDemoHttp() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "http" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo HTTP: " + e.message); }
+  }
+  async function runDemoHls() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "hls" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo HLS: " + e.message); }
+  }
+  async function runDemoGithub() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "github" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo GitHub: " + e.message); }
+  }
+
+  function openAddModal() { document.getElementById("addModal").classList.add("open"); }
+  function closeAddModal() { document.getElementById("addModal").classList.remove("open"); }
+  function switchAddTab(tab, btn) {
+    addTab = tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-pane").forEach(p => p.style.display = "none");
+    document.getElementById(`tab-${tab}`).style.display = "block";
+  }
+  async function submitAddModal() {
+    try {
+      if (addTab === "single") {
+        const rec = await api("/api/downloads/add", {
+          method: "POST",
+          body: JSON.stringify({
+            url: document.getElementById("inUrl").value,
+            filename: document.getElementById("inFilename").value || null,
+            max_connections: Number(document.getElementById("inConns").value || 8),
+            queue_id: document.getElementById("inQueue").value || "main",
+            expected_checksum: document.getElementById("inChecksum").value || "",
+          }),
+        });
+        selectDownload(rec.id);
+      } else if (addTab === "curl") {
+        const rec = await api("/api/downloads/import-curl", {
+          method: "POST",
+          body: JSON.stringify({ curl: document.getElementById("inCurl").value }),
+        });
+        selectDownload(rec.id);
+      } else {
+        await api("/api/downloads/add-batch", {
+          method: "POST",
+          body: JSON.stringify({ pattern: document.getElementById("inBatch").value }),
+        });
+      }
+      closeAddModal();
+    } catch (e) {
+      alert("Erro: " + e.message);
+    }
+  }
+
+  async function openSettingsModal() {
+    const s = await api("/api/settings");
+    document.getElementById("setDir").value = s.download_dir || "";
+    document.getElementById("setConns").value = s.default_connections || 8;
+    document.getElementById("setLimit").value = s.global_speed_limit_kbps || 0;
+    document.getElementById("settingsModal").classList.add("open");
+  }
+  function closeSettingsModal() { document.getElementById("settingsModal").classList.remove("open"); }
+  async function saveSettings() {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        download_dir: document.getElementById("setDir").value,
+        default_connections: Number(document.getElementById("setConns").value),
+        global_speed_limit_kbps: Number(document.getElementById("setLimit").value),
+      }),
+    });
+    closeSettingsModal();
+  }
+
+  loadSnapshot();
+  connectWS();
+</script>
+</body>
+</html>

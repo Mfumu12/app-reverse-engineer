@@ -1,0 +1,25 @@
+[project]
+name = "hyperdl"
+version = "1.0.0"
+description = "Hybrid multi-segment HTTP & HLS download accelerator combining IDM dynamic splitting with AB Download Manager's modern API, queues, CLI, and reactive UI."
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+hyperdl = "hyperdl.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hyperdl*"]
+
+[tool.setuptools.package-data]
+hyperdl = ["static/*", "extension/*"]
