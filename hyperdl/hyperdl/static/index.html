@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="pt" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HyperDL — Acelerador de Downloads Híbrido (IDM + ABD)</title>
+  <link rel="stylesheet" href="/static/tailwind.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden antialiased selection:bg-sky-500/30 selection:text-sky-200">
+  <!-- Header -->
+  <header class="shrink-0 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white font-bold">
+        ⚡
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-base tracking-tight text-white">HyperDL</span>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-500/20 to-indigo-500/20 text-sky-300 border border-sky-500/30">
+          IDM + ABD Engine
+        </span>
+        <span id="connBadge" class="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/80">
+          ⏳ A ligar...
+        </span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="openAddModal()"
+        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 transition cursor-pointer">
+        <span>+ Novo Download</span>
+      </button>
+      <button onclick="runDemoHttp()" title="Testa 8 conexões dinâmicas + work-stealing"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
+        🚀 Demo HTTP 16MB
+      </button>
+      <button onclick="runDemoHls()" title="Testa stream HLS .m3u8 multi-segmento"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
+        🎬 Demo HLS (.m3u8)
+      </button>
+      <button onclick="runDemoGithub()" title="Testa download real do GitHub (internet)"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
+        🌐 Demo GitHub
+      </button>
+      <select id="speedSelect" onchange="changeGlobalSpeed(this.value)" title="Limitador global de velocidade"
+        class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-200 border border-slate-700 hover:border-sky-500/60 focus:outline-none focus:border-sky-500 transition cursor-pointer">
+        <option value="0">Velocidade: Ilimitada</option>
+        <option value="512">Limite: 512 KB/s</option>
+        <option value="1024">Limite: 1 MB/s</option>
+        <option value="2048">Limite: 2 MB/s</option>
+        <option value="5120">Limite: 5 MB/s</option>
+      </select>
+      <a href="/api/extension.zip" download
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition">
+        🧩 Extensão
+      </a>
+      <button onclick="openSettingsModal()"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-sky-500/60 transition cursor-pointer">
+        ⚙ Config
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="flex flex-1 min-h-0">
+    <!-- Sidebar -->
+    <aside class="hidden md:flex w-60 shrink-0 bg-slate-900/70 border-r border-slate-800 p-3 flex-col gap-5 overflow-y-auto">
+      <div>
+        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Estado</div>
+        <div class="space-y-0.5">
+          <div class="nav-item active flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition bg-sky-500/15 text-sky-300 font-semibold" data-filter-type="all" onclick="setFilter('all', '')">
+            <span>Todos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-300 tabular-nums" id="cnt-all">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="downloading" onclick="setFilter('status', 'downloading')">
+            <span>A descarregar</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-downloading">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="completed" onclick="setFilter('status', 'completed')">
+            <span>Concluídos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-completed">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="paused" onclick="setFilter('status', 'paused')">
+            <span>Pausados</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-paused">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="status" data-filter-val="error" onclick="setFilter('status', 'error')">
+            <span>Erros</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-error">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Categorias</div>
+        <div class="space-y-0.5">
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="video" onclick="setFilter('category', 'video')">
+            <span>🎬 Vídeo &amp; HLS</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-video">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="compressed" onclick="setFilter('category', 'compressed')">
+            <span>🗜 Comprimidos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-compressed">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="programs" onclick="setFilter('category', 'programs')">
+            <span>⚙ Programas</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-programs">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="documents" onclick="setFilter('category', 'documents')">
+            <span>📄 Documentos</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-documents">0</span>
+          </div>
+          <div class="nav-item flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition text-slate-300 hover:bg-slate-800/80 hover:text-white" data-filter-type="category" data-filter-val="music" onclick="setFilter('category', 'music')">
+            <span>🎵 Música</span><span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 tabular-nums" id="cnt-cat-music">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Filas (Queues)</div>
+        <div id="queuesList" class="space-y-1"></div>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1 flex flex-col min-w-0">
+      <!-- Live Stats Bar -->
+      <div class="px-4 py-2.5 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap text-xs">
+        <div class="flex items-center gap-5 flex-wrap">
+          <span class="text-slate-400">Velocidade Total: <b id="totalSpeed" class="text-sky-400 font-semibold tabular-nums">0 B/s</b></span>
+          <span class="text-slate-400">Ativos: <b id="activeCount" class="text-emerald-400 font-semibold tabular-nums">0</b></span>
+          <span class="text-slate-400">Conexões TCP: <b id="totalConns" class="text-indigo-400 font-semibold tabular-nums">0</b></span>
+          <span class="text-slate-400">Splits Dinâmicos: <b id="totalSplits" class="text-cyan-400 font-semibold tabular-nums">0</b></span>
+        </div>
+        <input id="searchInput" oninput="renderTable()" placeholder="Filtrar por nome ou URL..."
+          class="w-56 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition" />
+      </div>
+
+      <!-- Downloads Table -->
+      <div class="flex-1 overflow-auto">
+        <table class="w-full border-collapse text-xs">
+          <thead class="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-400">
+            <tr>
+              <th class="text-left font-semibold px-4 py-2.5">Ficheiro</th>
+              <th class="text-left font-semibold px-3 py-2.5">Tamanho</th>
+              <th class="text-left font-semibold px-3 py-2.5">Progresso</th>
+              <th class="text-left font-semibold px-3 py-2.5">Velocidade</th>
+              <th class="text-left font-semibold px-3 py-2.5">Conns</th>
+              <th class="text-left font-semibold px-3 py-2.5">ETA</th>
+              <th class="text-left font-semibold px-3 py-2.5">Estado</th>
+              <th class="text-right font-semibold px-4 py-2.5">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="downloadsBody" class="divide-y divide-slate-800/70"></tbody>
+        </table>
+        <div id="emptyState" class="text-center py-16 px-6 text-slate-400 text-sm">
+          <div class="text-3xl mb-2">⚡</div>
+          Sem downloads ainda. Clica em <b class="text-slate-200">+ Novo Download</b> ou em
+          <b class="text-sky-400">🚀 Demo HTTP 16MB</b> para ver o motor multi-segmento em ação!
+        </div>
+      </div>
+
+      <!-- Segment Inspector Drawer -->
+      <div id="inspector" class="hidden shrink-0 h-72 bg-slate-900 border-t border-slate-800 flex flex-col">
+        <div class="px-4 py-2 bg-slate-800/70 border-b border-slate-800 flex items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <strong id="inspTitle" class="text-slate-100 truncate">Download</strong>
+            <span id="inspMeta" class="text-slate-400 truncate"></span>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="inspVerifyBtn" onclick="verifySelected()"
+              class="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition cursor-pointer">
+              🔐 Verificar SHA-256
+            </button>
+            <button onclick="closeInspector()"
+              class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] transition cursor-pointer">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="lg:col-span-7 flex flex-col gap-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>Mapa de Segmentos (Work-Stealing Dinâmico estilo IDM)</span>
+              <span id="inspSplitBadge" class="text-cyan-400 font-medium"></span>
+            </div>
+            <div id="segMap" class="flex w-full h-5 bg-slate-950 border border-slate-800 rounded-md overflow-hidden"></div>
+            <div id="segGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5"></div>
+          </div>
+
+          <div class="lg:col-span-5 flex flex-col gap-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>Throughput em Tempo Real</span>
+              <span id="inspSpeedNow" class="text-sky-400 font-semibold tabular-nums"></span>
+            </div>
+            <canvas id="speedChart" width="400" height="78" class="w-full h-20 bg-slate-950 border border-slate-800 rounded-lg"></canvas>
+            <div id="inspDetails" class="text-[11px] text-slate-400 leading-relaxed break-all"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add Download Modal -->
+  <div id="addModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm items-center justify-center p-4">
+    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+        <span class="font-bold text-sm text-white">Adicionar Download</span>
+        <button onclick="closeAddModal()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="flex gap-2 border-b border-slate-800 pb-3">
+          <button class="tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer" onclick="switchAddTab('single', this)">URL Direta / HLS</button>
+          <button class="tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer" onclick="switchAddTab('curl', this)">Importar cURL</button>
+          <button class="tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer" onclick="switchAddTab('batch', this)">Lote / Wildcard</button>
+        </div>
+
+        <div id="tab-single" class="tab-pane space-y-3">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">URL (HTTP/HTTPS ou .m3u8)</label>
+            <input id="inUrl" type="url" placeholder="https://exemplo.com/arquivo.zip"
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Nome do ficheiro (opcional)</label>
+              <input id="inFilename" type="text" placeholder="Auto-detetar"
+                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Conexões (1–32)</label>
+              <input id="inConns" type="number" min="1" max="32" value="8"
+                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Fila (Queue)</label>
+              <select id="inQueue"
+                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">SHA-256 esperado (opcional)</label>
+              <input id="inChecksum" type="text" placeholder="Opcional"
+                class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-curl" class="tab-pane hidden">
+          <label class="block text-xs text-slate-400 mb-1">Cola o comando cURL (copiado do Chrome/Edge DevTools)</label>
+          <textarea id="inCurl" rows="5" placeholder="curl 'https://...' -H 'Cookie: ...' -H 'User-Agent: ...'"
+            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500"></textarea>
+        </div>
+
+        <div id="tab-batch" class="tab-pane hidden">
+          <label class="block text-xs text-slate-400 mb-1">Padrão Wildcard (ex: <code class="text-sky-300">https://host/part_[01..10].zip</code>) ou várias URLs</label>
+          <textarea id="inBatch" rows="5" placeholder="https://exemplo.com/arquivos/parte_[01..08].bin"
+            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 font-mono focus:outline-none focus:border-sky-500"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="closeAddModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">Cancelar</button>
+          <button onclick="submitAddModal()" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 cursor-pointer">Iniciar Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm items-center justify-center p-4">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+        <span class="font-bold text-sm text-white">Configurações HyperDL</span>
+        <button onclick="closeSettingsModal()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer">✕</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Pasta de Downloads</label>
+          <input id="setDir" type="text"
+            class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Conexões padrão</label>
+            <input id="setConns" type="number" min="1" max="32"
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Limite global (KB/s)</label>
+            <input id="setLimit" type="number" min="0"
+              class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-sky-500" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer">Fechar</button>
+          <button onclick="saveSettings()" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 cursor-pointer">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let downloads = new Map();
+  let queues = [];
+  let settings = {};
+  let filter = { type: "all", value: "" };
+  let selectedId = null;
+  let addTab = "single";
+  let speedHistory = [];
+  let wsConnected = false;
+
+  const STATUS_CLASSES = {
+    downloading: "bg-sky-500/20 text-sky-300 border-sky-500/30",
+    completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    paused: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+    queued: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+    probing: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+    assembling: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+    error: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+    cancelled: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+  };
+
+  function setConnBadge(text, colorClass) {
+    const b = document.getElementById("connBadge");
+    if (!b) return;
+    b.textContent = text;
+    b.className = `text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${colorClass}`;
+  }
+
+  function fmtBytes(n) {
+    if (n === null || n === undefined || n < 0) return "Desconhecido";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    let v = Number(n);
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
+  }
+  function fmtEta(s) {
+    if (s === null || s === undefined || !isFinite(s)) return "—";
+    s = Math.max(0, Math.round(s));
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  }
+  function esc(str) {
+    return String(str ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  async function loadSnapshot() {
+    try {
+      const [dlRes, qRes, sRes] = await Promise.all([
+        api("/api/downloads?segments=true"),
+        api("/api/queues"),
+        api("/api/settings"),
+      ]);
+      downloads.clear();
+      for (const d of dlRes.downloads || []) downloads.set(d.id, d);
+      queues = qRes.queues || [];
+      settings = sRes || {};
+      syncSettingsUI();
+      renderAll();
+      if (!wsConnected) setConnBadge("🟡 HTTP Ativo", "bg-amber-500/15 text-amber-300 border-amber-500/30");
+    } catch (e) {
+      setConnBadge("🔴 Desligado", "bg-rose-500/15 text-rose-300 border-rose-500/30");
+    }
+  }
+
+  function connectWS() {
+    try {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.host}/api/ws`);
+      ws.onopen = () => {
+        wsConnected = true;
+        setConnBadge("🟢 Tempo Real", "bg-emerald-500/15 text-emerald-300 border-emerald-500/30");
+      };
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.event === "snapshot") {
+          downloads.clear();
+          for (const d of msg.data.downloads) downloads.set(d.id, d);
+          queues = msg.data.queues || [];
+          settings = msg.data.settings || {};
+          syncSettingsUI();
+          renderAll();
+        } else if (msg.event === "download_added") {
+          downloads.set(msg.data.id, msg.data);
+          renderAll();
+        } else if (msg.event === "downloads_batch_update") {
+          for (const d of msg.data) downloads.set(d.id, d);
+          renderAll();
+        } else if (msg.event === "download_update") {
+          downloads.set(msg.data.id, msg.data);
+          renderAll();
+        } else if (msg.event === "download_removed") {
+          downloads.delete(msg.data.id);
+          if (selectedId === msg.data.id) closeInspector();
+          renderAll();
+        } else if (msg.event === "settings_update") {
+          settings = msg.data;
+          syncSettingsUI();
+        }
+      };
+      ws.onerror = () => { wsConnected = false; };
+      ws.onclose = () => {
+        wsConnected = false;
+        setConnBadge("🟡 HTTP Polling", "bg-amber-500/15 text-amber-300 border-amber-500/30");
+        setTimeout(connectWS, 2000);
+      };
+    } catch (e) {
+      wsConnected = false;
+    }
+  }
+
+  setInterval(() => {
+    const hasActive = [...downloads.values()].some(d => ["downloading", "probing", "assembling", "queued"].includes(d.status));
+    if (!wsConnected && (hasActive || downloads.size > 0)) {
+      loadSnapshot();
+    }
+  }, 500);
+
+  function syncSettingsUI() {
+    const sel = document.getElementById("speedSelect");
+    const v = String(settings.global_speed_limit_kbps || 0);
+    if ([...sel.options].some(o => o.value === v)) sel.value = v;
+  }
+
+  function setFilter(type, value) {
+    filter = { type, value };
+    document.querySelectorAll(".nav-item").forEach(el => {
+      el.classList.remove("bg-sky-500/15", "text-sky-300", "font-semibold");
+      el.classList.add("text-slate-300");
+    });
+    const selector = type === "all"
+      ? `[data-filter-type="all"]`
+      : `[data-filter-type="${type}"][data-filter-val="${value}"]`;
+    document.querySelectorAll(selector).forEach(el => {
+      el.classList.remove("text-slate-300");
+      el.classList.add("bg-sky-500/15", "text-sky-300", "font-semibold");
+    });
+    renderQueues();
+    renderTable();
+  }
+
+  function renderAll() {
+    renderSidebarCounts();
+    renderQueues();
+    renderStats();
+    renderTable();
+    renderInspector();
+  }
+
+  function renderSidebarCounts() {
+    const all = [...downloads.values()];
+    document.getElementById("cnt-all").textContent = all.length;
+    for (const st of ["downloading", "completed", "paused", "error"]) {
+      document.getElementById(`cnt-${st}`).textContent = all.filter(d => d.status === st).length;
+    }
+    for (const cat of ["video", "compressed", "programs", "documents", "music"]) {
+      document.getElementById(`cnt-cat-${cat}`).textContent = all.filter(d => d.category === cat).length;
+    }
+  }
+
+  function renderQueues() {
+    const el = document.getElementById("queuesList");
+    const sel = document.getElementById("inQueue");
+    const prevSel = sel.value;
+    el.innerHTML = queues.map(q => {
+      const isAct = filter.type === "queue" && filter.value === q.id;
+      return `<div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition ${isAct ? 'bg-indigo-500/20 text-indigo-300 font-semibold' : 'text-slate-300 hover:bg-slate-800/80'}" onclick="setFilter('queue','${esc(q.id)}')">
+        <span class="flex items-center gap-2 truncate">
+          <span class="w-2 h-2 rounded-full ${q.is_running ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]' : 'bg-slate-500'}"></span>
+          <span class="truncate">${esc(q.name)}</span>
+        </span>
+        <button class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] cursor-pointer" onclick="event.stopPropagation(); toggleQueue('${esc(q.id)}', ${q.is_running})">${q.is_running ? '⏸' : '▶'}</button>
+      </div>`;
+    }).join("");
+    sel.innerHTML = queues.map(q => `<option value="${esc(q.id)}">${esc(q.name)}</option>`).join("");
+    if (prevSel) sel.value = prevSel;
+  }
+
+  function renderStats() {
+    const all = [...downloads.values()];
+    const active = all.filter(d => ["downloading", "probing", "assembling"].includes(d.status));
+    const speed = active.reduce((a, d) => a + (d.speed_bps || 0), 0);
+    const conns = active.reduce((a, d) => a + (d.active_connections || 0), 0);
+    const splits = all.reduce((a, d) => a + (d.split_count || 0), 0);
+    document.getElementById("totalSpeed").textContent = fmtBytes(speed) + "/s";
+    document.getElementById("activeCount").textContent = active.length;
+    document.getElementById("totalConns").textContent = conns;
+    document.getElementById("totalSplits").textContent = splits;
+
+    if (selectedId && downloads.has(selectedId)) {
+      const d = downloads.get(selectedId);
+      speedHistory.push(d.speed_bps || 0);
+      if (speedHistory.length > 50) speedHistory.shift();
+    }
+  }
+
+  function renderTable() {
+    const q = (document.getElementById("searchInput").value || "").toLowerCase();
+    const list = [...downloads.values()]
+      .filter(d => {
+        if (filter.type === "status" && d.status !== filter.value) return false;
+        if (filter.type === "category" && d.category !== filter.value) return false;
+        if (filter.type === "queue" && d.queue_id !== filter.value) return false;
+        if (q && !d.filename.toLowerCase().includes(q) && !d.url.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => b.created_at - a.created_at);
+
+    const body = document.getElementById("downloadsBody");
+    document.getElementById("emptyState").style.display = list.length ? "none" : "block";
+    body.innerHTML = list.map(d => {
+      const pct = d.progress || 0;
+      const isActive = ["downloading", "probing", "assembling", "queued"].includes(d.status);
+      const badgeCls = STATUS_CLASSES[d.status] || "bg-slate-800 text-slate-300 border-slate-700";
+      return `<tr class="cursor-pointer transition ${selectedId === d.id ? 'bg-sky-500/12' : 'hover:bg-slate-900/70'}" onclick="selectDownload('${esc(d.id)}')">
+        <td class="px-4 py-2.5">
+          <div class="font-semibold text-slate-100 max-w-xs truncate" title="${esc(d.filename)}">${esc(d.filename)}</div>
+          <div class="text-[11px] text-slate-400 max-w-xs truncate" title="${esc(d.url)}">${esc(d.download_type.toUpperCase())} • ${esc(d.url)}</div>
+          ${d.error_message ? `<div class="text-[11px] text-rose-300 mt-0.5">⚠ ${esc(d.error_message)}</div>` : ''}
+        </td>
+        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">${fmtBytes(d.downloaded_bytes)} / ${fmtBytes(d.total_size)}</td>
+        <td class="px-3 py-2.5">
+          <div class="flex items-center gap-2">
+            <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-all duration-150" style="width:${pct}%"></div>
+            </div>
+            <span class="text-[11px] text-slate-300 w-11 tabular-nums">${pct.toFixed(1)}%</span>
+          </div>
+        </td>
+        <td class="px-3 py-2.5 text-slate-200 tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtBytes(d.speed_bps) + '/s' : '—'}</td>
+        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">
+          ${d.active_connections || 0}/${d.max_connections}${d.split_count ? ` <span class="text-cyan-400 text-[11px]">(+${d.split_count})</span>` : ''}
+        </td>
+        <td class="px-3 py-2.5 text-slate-300 tabular-nums whitespace-nowrap">${d.status === 'downloading' ? fmtEta(d.eta_seconds) : '—'}</td>
+        <td class="px-3 py-2.5">
+          <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${badgeCls}">${esc(d.status)}</span>
+        </td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap space-x-1" onclick="event.stopPropagation()">
+          ${isActive
+            ? `<button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs cursor-pointer" onclick="pauseDl('${esc(d.id)}')" title="Pausar">⏸</button>`
+            : (d.status !== 'completed' ? `<button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs cursor-pointer" onclick="resumeDl('${esc(d.id)}')" title="Retomar">▶</button>` : '')}
+          ${d.status === 'completed' ? `<a class="inline-block px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-emerald-300" href="/api/downloads/${esc(d.id)}/file" title="Baixar ficheiro">⬇</a>` : ''}
+          <button class="px-2 py-1 rounded-md bg-slate-800 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-500/50 text-rose-300 text-xs cursor-pointer" onclick="deleteDl('${esc(d.id)}')" title="Remover">🗑</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  function selectDownload(id) {
+    if (selectedId !== id) speedHistory = [];
+    selectedId = id;
+    document.getElementById("inspector").classList.remove("hidden");
+    renderTable();
+    renderInspector();
+  }
+  function closeInspector() {
+    selectedId = null;
+    document.getElementById("inspector").classList.add("hidden");
+    renderTable();
+  }
+
+  function renderInspector() {
+    if (!selectedId || !downloads.has(selectedId)) return;
+    const d = downloads.get(selectedId);
+    document.getElementById("inspTitle").textContent = d.filename;
+    document.getElementById("inspMeta").textContent = `${d.download_type.toUpperCase()} • Range: ${d.supports_range ? 'Sim' : 'Não'} • ETag: ${d.etag || '—'}`;
+    document.getElementById("inspSplitBadge").textContent = `${(d.segments || []).length} segmentos (${d.split_count || 0} splits dinâmicos)`;
+    document.getElementById("inspSpeedNow").textContent = fmtBytes(d.speed_bps) + "/s";
+    document.getElementById("inspVerifyBtn").style.display = d.status === "completed" ? "inline-flex" : "none";
+
+    const segs = d.segments || [];
+    const total = d.total_size > 0 ? d.total_size : segs.reduce((a, s) => a + Math.max(1, s.total_bytes || s.downloaded_bytes), 0);
+    document.getElementById("segMap").innerHTML = segs.map(s => {
+      const segTotal = d.download_type === 'hls' ? 1 : Math.max(1, s.total_bytes || 1);
+      const widthPct = d.download_type === 'hls' ? (100 / Math.max(1, segs.length)) : (segTotal / Math.max(1, total)) * 100;
+      const fillPct = s.status === 'completed' ? 100 : (d.download_type === 'hls' ? (s.status === 'downloading' ? 50 : 0) : Math.min(100, (s.downloaded_bytes / segTotal) * 100));
+      const colorCls = s.status === 'completed' ? 'bg-emerald-500' : s.status === 'downloading' ? 'bg-sky-400' : s.status === 'error' ? 'bg-rose-500' : 'bg-amber-400';
+      return `<div class="h-full border-r border-slate-950 bg-slate-800" style="width:${widthPct}%" title="Seg #${s.segment_index}: ${s.status} (${fillPct.toFixed(0)}%)">
+        <div class="h-full transition-all duration-150 ${colorCls}" style="width:${fillPct}%"></div>
+      </div>`;
+    }).join("");
+
+    document.getElementById("segGrid").innerHTML = segs.slice(0, 24).map(s => {
+      const pct = s.status === 'completed' ? 100 : (s.total_bytes > 0 ? Math.min(100, (s.downloaded_bytes / s.total_bytes) * 100) : 0);
+      return `<div class="bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-[11px]">
+        <div class="flex justify-between">
+          <b class="text-slate-200">#${s.segment_index}</b>
+          <span class="text-sky-400 tabular-nums">${s.status === 'downloading' ? fmtBytes(s.speed_bps) + '/s' : s.status}</span>
+        </div>
+        <div class="text-slate-400 mt-0.5 tabular-nums">${fmtBytes(s.downloaded_bytes)}${s.total_bytes > 0 ? ' / ' + fmtBytes(s.total_bytes) : ''} (${pct.toFixed(0)}%)</div>
+      </div>`;
+    }).join("");
+
+    let info = `<b class="text-slate-300">Caminho:</b> ${esc(d.file_path)}<br/>`;
+    if (d.actual_checksum) info += `<b class="text-slate-300">${esc((d.checksum_algorithm || 'sha256').toUpperCase())}:</b> <code class="text-emerald-300">${esc(d.actual_checksum)}</code><br/>`;
+    if (d.error_message) info += `<span class="text-rose-300"><b>Erro:</b> ${esc(d.error_message)}</span>`;
+    document.getElementById("inspDetails").innerHTML = info;
+
+    drawSpeedChart();
+  }
+
+  function drawSpeedChart() {
+    const canvas = document.getElementById("speedChart");
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    if (speedHistory.length < 2) return;
+    const maxV = Math.max(1024, ...speedHistory);
+    ctx.beginPath();
+    speedHistory.forEach((v, i) => {
+      const x = (i / (speedHistory.length - 1)) * w;
+      const y = h - 6 - (v / maxV) * (h - 14);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = "rgba(56,189,248,0.16)";
+    ctx.fill();
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...opts,
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t);
+    }
+    return res.json();
+  }
+
+  async function pauseDl(id) { await api(`/api/downloads/${id}/pause`, { method: "POST" }); }
+  async function resumeDl(id) { await api(`/api/downloads/${id}/resume`, { method: "POST" }); }
+  async function deleteDl(id) { await api(`/api/downloads/${id}?delete_file=true`, { method: "DELETE" }); }
+  async function toggleQueue(id, running) {
+    await api(`/api/queues/${id}/${running ? 'stop' : 'start'}`, { method: "POST" });
+    const q = await api("/api/queues");
+    queues = q.queues;
+    renderQueues();
+  }
+  async function changeGlobalSpeed(kbps) {
+    await api("/api/settings", { method: "PUT", body: JSON.stringify({ global_speed_limit_kbps: Number(kbps) }) });
+  }
+  async function verifySelected() {
+    if (!selectedId) return;
+    await api(`/api/downloads/${selectedId}/verify`, { method: "POST", body: JSON.stringify({ algorithm: "sha256" }) });
+  }
+  async function runDemoHttp() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "http" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo HTTP: " + e.message); }
+  }
+  async function runDemoHls() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "hls" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo HLS: " + e.message); }
+  }
+  async function runDemoGithub() {
+    try {
+      const rec = await api("/api/demo/start", { method: "POST", body: JSON.stringify({ mode: "github" }) });
+      downloads.set(rec.id, rec);
+      selectDownload(rec.id);
+      renderAll();
+    } catch (e) { alert("Erro ao iniciar Demo GitHub: " + e.message); }
+  }
+
+  function openAddModal() {
+    const m = document.getElementById("addModal");
+    m.classList.remove("hidden");
+    m.classList.add("flex");
+  }
+  function closeAddModal() {
+    const m = document.getElementById("addModal");
+    m.classList.add("hidden");
+    m.classList.remove("flex");
+  }
+  function switchAddTab(tab, btn) {
+    addTab = tab;
+    document.querySelectorAll(".tab").forEach(t => {
+      t.className = "tab px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer";
+    });
+    btn.className = "tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-pointer";
+    document.querySelectorAll(".tab-pane").forEach(p => p.classList.add("hidden"));
+    document.getElementById(`tab-${tab}`).classList.remove("hidden");
+  }
+  async function submitAddModal() {
+    try {
+      if (addTab === "single") {
+        const rec = await api("/api/downloads/add", {
+          method: "POST",
+          body: JSON.stringify({
+            url: document.getElementById("inUrl").value,
+            filename: document.getElementById("inFilename").value || null,
+            max_connections: Number(document.getElementById("inConns").value || 8),
+            queue_id: document.getElementById("inQueue").value || "main",
+            expected_checksum: document.getElementById("inChecksum").value || "",
+          }),
+        });
+        downloads.set(rec.id, rec);
+        selectDownload(rec.id);
+        renderAll();
+      } else if (addTab === "curl") {
+        const rec = await api("/api/downloads/import-curl", {
+          method: "POST",
+          body: JSON.stringify({ curl: document.getElementById("inCurl").value }),
+        });
+        downloads.set(rec.id, rec);
+        selectDownload(rec.id);
+        renderAll();
+      } else {
+        await api("/api/downloads/add-batch", {
+          method: "POST",
+          body: JSON.stringify({ pattern: document.getElementById("inBatch").value }),
+        });
+        await loadSnapshot();
+      }
+      closeAddModal();
+    } catch (e) {
+      alert("Erro: " + e.message);
+    }
+  }
+
+  async function openSettingsModal() {
+    const s = await api("/api/settings");
+    document.getElementById("setDir").value = s.download_dir || "";
+    document.getElementById("setConns").value = s.default_connections || 8;
+    document.getElementById("setLimit").value = s.global_speed_limit_kbps || 0;
+    const m = document.getElementById("settingsModal");
+    m.classList.remove("hidden");
+    m.classList.add("flex");
+  }
+  function closeSettingsModal() {
+    const m = document.getElementById("settingsModal");
+    m.classList.add("hidden");
+    m.classList.remove("flex");
+  }
+  async function saveSettings() {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        download_dir: document.getElementById("setDir").value,
+        default_connections: Number(document.getElementById("setConns").value),
+        global_speed_limit_kbps: Number(document.getElementById("setLimit").value),
+      }),
+    });
+    closeSettingsModal();
+  }
+
+  loadSnapshot();
+  connectWS();
+</script>
+</body>
+</html>

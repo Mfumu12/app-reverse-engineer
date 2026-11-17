@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+google_drive/
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
+hyperdl_downloads/
+hyperdl.zip
+node_modules/
+package-lock.json

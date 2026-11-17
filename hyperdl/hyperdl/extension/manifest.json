@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "HyperDL Browser Integrator",
+  "version": "1.0.0",
+  "description": "Send browser downloads, context-menu links, and HLS streams to HyperDL Accelerator.",
+  "permissions": ["downloads", "contextMenus", "storage"],
+  "host_permissions": ["http://127.0.0.1:8787/*", "http://localhost:8787/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "HyperDL"
+  }
+}

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@source "../hyperdl/static/index.html";
+@source "../hyperdl/extension/popup.html";
+
+@layer base {
+  html, body {
+    color-scheme: dark;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #020617;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+}

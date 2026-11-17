@@ -1,0 +1,11 @@
+{
+  "name": "hyperdl-frontend",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./input.css -o ../hyperdl/static/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.5",
+    "tailwindcss": "^4.3.5"
+  }
+}

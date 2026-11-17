@@ -1,0 +1,44 @@
+name: Build Windows EXE (HyperDL)
+
+on:
+  push:
+    paths:
+      - "hyperdl/**"
+      - ".github/workflows/build-windows-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies and run tests
+        working-directory: hyperdl
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" pyinstaller
+          pytest -v tests
+
+      - name: Build HyperDL.exe with PyInstaller
+        working-directory: hyperdl
+        run: |
+          pyinstaller --clean --noconfirm hyperdl.spec
+
+      - name: Smoke test HyperDL.exe --version
+        working-directory: hyperdl
+        run: |
+          .\dist\HyperDL.exe --version
+
+      - name: Upload HyperDL.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HyperDL-Windows-x64
+          path: hyperdl/dist/HyperDL.exe
+          if-no-files-found: error
