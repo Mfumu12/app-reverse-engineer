@@ -1,21 +1,32 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
+datas = [
+    ("hyperdl/static", "hyperdl/static"),
+    ("hyperdl/extension", "hyperdl/extension"),
+]
+binaries = []
 hidden_imports = (
     collect_submodules("hyperdl")
     + collect_submodules("aiohttp")
-    + ["sqlite3", "webbrowser", "zipfile"]
+    + ["sqlite3", "webbrowser", "zipfile", "bottle", "proxy_tools"]
 )
+
+for pkg in ("webview", "pythonnet", "clr_loader"):
+    try:
+        d, b, h = collect_all(pkg)
+        datas += d
+        binaries += b
+        hidden_imports += h
+    except Exception:
+        pass
 
 a = Analysis(
     ["launcher.py"],
     pathex=["."],
-    binaries=[],
-    datas=[
-        ("hyperdl/static", "hyperdl/static"),
-        ("hyperdl/extension", "hyperdl/extension"),
-    ],
+    binaries=binaries,
+    datas=datas,
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},
@@ -33,13 +44,14 @@ exe = EXE(
     a.datas,
     [],
     name="GenniusDM",
+    icon="hyperdl/static/genniusdm.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

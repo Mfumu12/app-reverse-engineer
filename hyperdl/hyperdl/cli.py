@@ -83,6 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"HyperDL {__version__}")
     sub = parser.add_subparsers(dest="command", required=False)
 
+    p_desktop = sub.add_parser("desktop", help="Launch Gennius DM native desktop window")
+    p_desktop.add_argument("--port", type=int, default=8787)
+    p_desktop.add_argument("--download-dir", default="")
+
     p_serve = sub.add_parser("serve", help="Start HyperDL Web UI, REST API & WebSocket server")
     p_serve.add_argument("--host", default="0.0.0.0")
     p_serve.add_argument("--port", type=int, default=8787)
@@ -127,22 +131,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command is None:
-        # Default desktop double-click mode (e.g., HyperDL.exe with no arguments)
-        import webbrowser
-        url = "http://127.0.0.1:8787"
-        try:
-            _api_request(url, "/api/ping")
-            print(f"[Gennius DM] Ja esta em execucao em {url} — a abrir no navegador...")
-            webbrowser.open(url)
-            return 0
-        except Exception:
-            pass
+        from .desktop import run_desktop_app
+
         cfg = HyperDLConfig(host="127.0.0.1", port=8787)
-        print(f"[Gennius DM {__version__}] A iniciar em {url} ...")
-        print(f"[Gennius DM] Pasta de downloads: {cfg.download_dir}")
-        print("[Gennius DM] Mantenha esta janela aberta enquanto faz downloads.")
-        run_server(cfg, open_browser=True)
-        return 0
+        return run_desktop_app(cfg)
+
+    if args.command == "desktop":
+        from .desktop import run_desktop_app
+
+        cfg = HyperDLConfig(host="127.0.0.1", port=args.port)
+        if args.download_dir:
+            cfg.download_dir = Path(args.download_dir)
+        return run_desktop_app(cfg)
 
     if args.command == "serve":
         cfg = HyperDLConfig(host=args.host, port=args.port, default_connections=args.connections, api_key=args.api_key)

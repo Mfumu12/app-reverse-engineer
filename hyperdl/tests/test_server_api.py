@@ -39,6 +39,11 @@ def test_server_api_and_demo_download(tmp_path: Path):
                 assert r.status == 200
                 assert len(await r.read()) > 200
 
+            async with client.get(f"{base}/api/extension/status") as r:
+                assert r.status == 200
+                st = await r.json()
+                assert "extension_dir" in st
+
             async with client.post(
                 f"{base}/api/downloads/add",
                 json={"url": f"{base}/api/demo/file/1?delay_ms=2", "max_connections": 4},

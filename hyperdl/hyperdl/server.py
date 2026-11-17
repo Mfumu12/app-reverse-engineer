@@ -17,6 +17,7 @@ from typing import Any
 from aiohttp import WSMsgType, web
 
 from . import __version__
+from .browser_installer import detect_browsers, get_installed_extension_dir, install_extension_for_browser, sync_extension_files
 from .config import HyperDLConfig
 from .engine.manager import DownloadManager
 from .utils.importers import expand_wildcard_url, extract_urls_from_text, parse_curl_command
@@ -151,6 +152,8 @@ class HyperDLServer:
 
         app.router.add_get("/api/ws", self.handle_ws)
         app.router.add_get("/api/extension.zip", self.handle_extension_zip)
+        app.router.add_get("/api/extension/status", self.handle_extension_status)
+        app.router.add_post("/api/extension/install", self.handle_extension_install)
 
         # Built-in Range & HLS Benchmark/Demo endpoints
         app.router.add_post("/api/demo/start", self.handle_demo_start)
@@ -427,6 +430,22 @@ class HyperDLServer:
             content_type="application/zip",
             headers={"Content-Disposition": 'attachment; filename="gennius-dm-extension.zip"'},
         )
+
+    async def handle_extension_status(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        ext_dir = sync_extension_files(EXT_DIR)
+        return web.json_response({
+            "extension_dir": str(ext_dir),
+            "browsers": detect_browsers(),
+        })
+
+    async def handle_extension_install(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        data = await request.json() if request.can_read_body else {}
+        browser_id = str(data.get("browser", "auto"))
+        mode = str(data.get("mode", "launch"))
+        result = install_extension_for_browser(EXT_DIR, browser_id=browser_id, mode=mode)
+        return web.json_response(result)
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 

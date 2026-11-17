@@ -23,7 +23,7 @@ jobs:
         working-directory: hyperdl
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]" pyinstaller
+          pip install -e ".[dev]" pywebview pyinstaller
           pytest -v tests
 
       - name: Build GenniusDM.exe with PyInstaller
@@ -31,10 +31,15 @@ jobs:
         run: |
           pyinstaller --clean --noconfirm hyperdl.spec
 
-      - name: Smoke test GenniusDM.exe --version
+      - name: Verify GenniusDM.exe binary
         working-directory: hyperdl
+        shell: pwsh
         run: |
-          .\dist\GenniusDM.exe --version
+          $f = Get-Item .\dist\GenniusDM.exe
+          if ($f.Length -lt 5000000) { throw "GenniusDM.exe unexpectedly small: $($f.Length)" }
+          $bytes = [System.IO.File]::ReadAllBytes($f.FullName)[0..1]
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Invalid PE header" }
+          Write-Host "Verified GenniusDM.exe ($($f.Length) bytes)"
 
       - name: Upload GenniusDM.exe artifact
         uses: actions/upload-artifact@v4
