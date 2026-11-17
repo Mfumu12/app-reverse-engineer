@@ -421,11 +421,11 @@ class HyperDLServer:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for p in sorted(EXT_DIR.iterdir()):
                 if p.is_file():
-                    zf.write(p, arcname=f"hyperdl-extension/{p.name}")
+                    zf.write(p, arcname=f"gennius-dm-extension/{p.name}")
         return web.Response(
             body=buf.getvalue(),
             content_type="application/zip",
-            headers={"Content-Disposition": 'attachment; filename="hyperdl-browser-extension.zip"'},
+            headers={"Content-Disposition": 'attachment; filename="gennius-dm-extension.zip"'},
         )
 
     # --- Built-in Range & HLS Benchmark Endpoints ---

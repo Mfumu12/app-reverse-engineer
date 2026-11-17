@@ -1,15 +1,35 @@
 {
   "manifest_version": 3,
-  "name": "Gennius DM Browser Integrator",
+  "name": "Gennius DM",
   "version": "1.0.0",
-  "description": "Send browser downloads, context-menu links, and HLS streams to Gennius DM.",
-  "permissions": ["downloads", "contextMenus", "storage"],
-  "host_permissions": ["http://127.0.0.1:8787/*", "http://localhost:8787/*"],
+  "description": "Gestor e acelerador de downloads com deteção de streams HLS (.m3u8) e captura automática para o Gennius DM.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "downloads",
+    "contextMenus",
+    "storage",
+    "webRequest",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8787/*",
+    "http://localhost:8787/*",
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Gennius DM"
+    "default_title": "Gennius DM",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }

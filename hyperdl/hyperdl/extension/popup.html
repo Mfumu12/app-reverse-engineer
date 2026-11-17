@@ -1,57 +1,176 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-<meta charset="utf-8" />
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; width: 270px; margin: 0; padding: 14px; background: #11141b; color: #e4e4e7; }
-  h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: #f4f4f5; }
-  label { display: block; font-size: 11px; color: #a1a1aa; margin-top: 8px; }
-  input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px; border-radius: 5px; border: 1px solid #27272a; background: #0b0d11; color: #f4f4f5; font-size: 12px; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: #d4d4d8; }
-  button { margin-top: 12px; width: 100%; padding: 7px; border: 0; border-radius: 5px; background: #2563eb; color: #fff; font-weight: 500; font-size: 12px; cursor: pointer; }
-  button:hover { background: #3b82f6; }
-  #status { margin-top: 8px; font-size: 11px; color: #34d399; }
-</style>
+  <meta charset="utf-8" />
+  <title>Gennius DM</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      width: 320px;
+      margin: 0;
+      padding: 12px;
+      background: #0b0d11;
+      color: #e4e4e7;
+      font-size: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #27272a;
+      margin-bottom: 10px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #f4f4f5;
+    }
+    .brand img { width: 18px; height: 18px; border-radius: 4px; }
+    .pill {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid #27272a;
+      background: #161a23;
+      color: #a1a1aa;
+    }
+    .pill.ok { color: #34d399; border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.1); }
+    .pill.err { color: #f87171; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.1); }
+    .section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #71717a;
+      margin: 10px 0 6px;
+      font-weight: 600;
+    }
+    .quick-row { display: flex; gap: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 5px;
+      border: 1px solid #27272a;
+      background: #11141b;
+      color: #f4f4f5;
+      font-size: 11.5px;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: #2563eb; }
+    button {
+      padding: 6px 10px;
+      border: 1px solid #27272a;
+      border-radius: 5px;
+      background: #161a23;
+      color: #e4e4e7;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: #1f2430; }
+    button.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+    button.primary:hover { background: #3b82f6; }
+    .media-list {
+      max-height: 120px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .media-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 5px 7px;
+      background: #11141b;
+      border: 1px solid #27272a;
+      border-radius: 5px;
+    }
+    .media-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #d4d4d8;
+      font-size: 11px;
+    }
+    .tag {
+      font-size: 9px;
+      font-family: monospace;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(37, 99, 235, 0.2);
+      color: #93c5fd;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      color: #d4d4d8;
+      font-size: 11.5px;
+    }
+    .field { margin-top: 7px; }
+    .field label { display: block; font-size: 10.5px; color: #a1a1aa; margin-bottom: 3px; }
+    .actions-footer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    #statusMsg { margin-top: 8px; font-size: 11px; min-height: 14px; color: #a1a1aa; }
+  </style>
 </head>
 <body>
-  <h3>Gennius DM Integrator</h3>
-  <label>Servidor local
-    <input id="serverUrl" type="text" value="http://127.0.0.1:8787" />
-  </label>
-  <label>API Key (opcional)
-    <input id="apiKey" type="text" placeholder="Opcional" />
-  </label>
-  <div class="row">
+  <div class="header">
+    <div class="brand">
+      <img src="icon48.png" alt="Gennius DM" />
+      <span>Gennius DM</span>
+    </div>
+    <span id="connPill" class="pill">A verificar...</span>
+  </div>
+
+  <div class="section-title">Envio Rápido</div>
+  <div class="quick-row">
+    <input id="quickUrl" type="text" placeholder="Cola um URL ou .m3u8..." />
+    <button id="sendQuick" class="primary">Enviar</button>
+  </div>
+
+  <div id="mediaWrap" style="display:none;">
+    <div class="section-title">Streams / Média Detetados nesta Aba</div>
+    <div id="mediaList" class="media-list"></div>
+  </div>
+
+  <div class="section-title">Configuração</div>
+  <label class="toggle-row">
     <input id="autoCapture" type="checkbox" />
     <span>Intercetar downloads do navegador</span>
+  </label>
+  <div class="field">
+    <label for="serverUrl">Servidor local</label>
+    <input id="serverUrl" type="text" value="http://127.0.0.1:8787" />
   </div>
-  <button id="save">Guardar e Testar</button>
-  <div id="status"></div>
-  <script>
-    const serverInput = document.getElementById("serverUrl");
-    const keyInput = document.getElementById("apiKey");
-    const capInput = document.getElementById("autoCapture");
-    const statusEl = document.getElementById("status");
-    chrome.storage.local.get({ serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: false }, (res) => {
-      serverInput.value = res.serverUrl;
-      keyInput.value = res.apiKey;
-      capInput.checked = res.autoCapture;
-    });
-    document.getElementById("save").onclick = async () => {
-      const serverUrl = serverInput.value.trim();
-      const apiKey = keyInput.value.trim();
-      const autoCapture = capInput.checked;
-      await chrome.storage.local.set({ serverUrl, apiKey, autoCapture });
-      try {
-        const r = await fetch(`${serverUrl.replace(/\/$/, "")}/api/ping`);
-        const j = await r.json();
-        statusEl.style.color = "#34d399";
-        statusEl.textContent = `Ligado: ${j.name || j.app} v${j.version}`;
-      } catch (e) {
-        statusEl.style.color = "#f87171";
-        statusEl.textContent = "Servidor Gennius DM indisponível";
-      }
-    };
-  </script>
+  <div class="field">
+    <label for="apiKey">API Key (opcional)</label>
+    <input id="apiKey" type="text" placeholder="Opcional" />
+  </div>
+
+  <div class="actions-footer">
+    <button id="openDash">Abrir Painel</button>
+    <button id="save" class="primary">Guardar</button>
+  </div>
+  <div id="statusMsg"></div>
+
+  <script src="popup.js"></script>
 </body>
 </html>
