@@ -162,6 +162,22 @@ class HyperDLServer:
         return app
 
     async def _on_startup(self, app: web.Application) -> None:
+        loop = asyncio.get_running_loop()
+        prev_handler = loop.get_exception_handler()
+
+        def _quiet_win_reset_handler(lp: asyncio.AbstractEventLoop, ctx: dict[str, Any]) -> None:
+            exc = ctx.get("exception")
+            msg = str(ctx.get("message", ""))
+            if isinstance(exc, ConnectionResetError) and (
+                "10054" in str(exc) or "_ProactorBasePipeTransport" in msg or "call_connection_lost" in msg
+            ):
+                return
+            if prev_handler is not None:
+                prev_handler(lp, ctx)
+            else:
+                lp.default_exception_handler(ctx)
+
+        loop.set_exception_handler(_quiet_win_reset_handler)
         await self.manager.start()
         self._flush_task = asyncio.create_task(self._flush_loop())
 
@@ -479,14 +495,18 @@ class HyperDLServer:
         await resp.prepare(request)
         cursor = start
         chunk_sz = 64 * 1024
-        while cursor <= end:
-            n = min(chunk_sz, end - cursor + 1)
-            await resp.write(_deterministic_demo_bytes(cursor, n))
-            cursor += n
-            if delay_ms > 0:
-                extra = delay_ms * 2 if (skew and start == 0) else delay_ms
-                await asyncio.sleep(extra / 1000.0)
-        await resp.write_eof()
+        try:
+            while cursor <= end:
+                n = min(chunk_sz, end - cursor + 1)
+                await resp.write(_deterministic_demo_bytes(cursor, n))
+                cursor += n
+                if delay_ms > 0:
+                    extra = delay_ms * 2 if (skew and start == 0) else delay_ms
+                    await asyncio.sleep(extra / 1000.0)
+            await resp.write_eof()
+        except (ConnectionResetError, asyncio.CancelledError, OSError):
+            # Expected when client closes early during dynamic segment splitting or pause
+            pass
         return resp
 
     async def handle_demo_hls_master(self, request: web.Request) -> web.Response:

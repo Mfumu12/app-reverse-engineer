@@ -12,6 +12,8 @@ def default_data_dir() -> Path:
     env = os.environ.get("HYPERDL_DATA_DIR")
     if env:
         return Path(env)
+    if getattr(sys, "frozen", False):
+        return Path.home() / ".genniusdm"
     return Path.home() / ".hyperdl"
 
 
