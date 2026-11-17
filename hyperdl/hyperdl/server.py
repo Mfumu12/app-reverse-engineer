@@ -20,7 +20,8 @@ from . import __version__
 from .browser_installer import detect_browsers, get_installed_extension_dir, install_extension_for_browser, sync_extension_files
 from .config import HyperDLConfig
 from .engine.manager import DownloadManager
-from .engine.youtube_engine import probe_youtube
+from .engine.youtube_engine import expand_youtube_playlist, extract_playlist_id, probe_youtube
+from .utils.filename import sanitize_filename
 from .utils.importers import expand_wildcard_url, extract_urls_from_text, parse_curl_command
 
 
@@ -235,6 +236,29 @@ class HyperDLServer:
                     "container": data.get("container", "mp4"),
                     "audio_bitrate": data.get("audio_bitrate", "320"),
                 }
+
+            if bool(data.get("download_playlist", False)) and extract_playlist_id(url):
+                pl = await expand_youtube_playlist(url, limit=int(data.get("playlist_limit", 100)))
+                entries = pl.get("entries") or []
+                if not entries:
+                    raise ValueError("Não foram encontrados vídeos nesta playlist.")
+                pl_folder = sanitize_filename(pl.get("playlist_title") or "Playlist YouTube")
+                target_dir = str(self.manager.config.download_dir / pl_folder)
+                added = []
+                for entry in entries:
+                    rec = await self.manager.add_download(
+                        entry["url"],
+                        save_dir=target_dir,
+                        queue_id=data.get("queue_id") or ("video" if (media_options or {}).get("media_mode") != "audio" else "main"),
+                        max_connections=data.get("max_connections"),
+                        speed_limit_kbps=data.get("speed_limit_kbps"),
+                        download_type="youtube",
+                        media_options=media_options,
+                        auto_start=bool(data.get("auto_start", True)),
+                    )
+                    added.append(rec.to_dict(include_segments=True))
+                return web.json_response({"playlist_title": pl.get("playlist_title"), "count": len(added), "downloads": added}, status=201)
+
             rec = await self.manager.add_download(
                 url,
                 filename=data.get("filename"),

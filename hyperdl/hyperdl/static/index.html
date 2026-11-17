@@ -368,9 +368,9 @@
 
         <div id="tab-youtube" class="tab-pane hidden space-y-3">
           <div>
-            <label class="block text-[11px] text-zinc-400 mb-1">Link do vídeo ou música no YouTube</label>
+            <label class="block text-[11px] text-zinc-400 mb-1">Link do vídeo, música ou playlist no YouTube</label>
             <div class="flex gap-2">
-              <input id="ytUrl" type="url" placeholder="https://www.youtube.com/watch?v=..."
+              <input id="ytUrl" type="url" oninput="onYtUrlInput()" placeholder="https://www.youtube.com/watch?v=... ou playlist?list=..."
                 class="flex-1 px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
               <button id="ytProbeBtn" type="button" onclick="probeYoutubeUrl()"
                 class="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition cursor-pointer shrink-0">
@@ -387,6 +387,14 @@
             </div>
           </div>
 
+          <label id="ytPlaylistBox" class="hidden items-center justify-between gap-2 p-2.5 rounded-md bg-blue-500/10 border border-blue-500/30 text-xs cursor-pointer">
+            <span class="flex items-center gap-2 text-zinc-200">
+              <input id="ytPlaylistCheck" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
+              <span id="ytPlaylistLabel">Baixar playlist completa</span>
+            </span>
+            <span id="ytPlaylistBadge" class="text-[11px] font-mono text-blue-300"></span>
+          </label>
+
           <div id="ytProbeError" class="hidden p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px]"></div>
 
           <div>
@@ -394,11 +402,11 @@
             <div class="grid grid-cols-2 gap-2">
               <button id="ytModeVideo" type="button" onclick="setYoutubeMode('video')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer">
-                Vídeo + Áudio
+                Video
               </button>
               <button id="ytModeAudio" type="button" onclick="setYoutubeMode('audio')"
                 class="px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer">
-                Só Áudio
+                Audio
               </button>
             </div>
           </div>
@@ -437,7 +445,7 @@
 
         <div class="flex justify-end gap-2 pt-1">
           <button onclick="closeAddModal()" class="px-3.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer">Cancelar</button>
-          <button onclick="submitAddModal()" class="px-4 py-1.5 rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 cursor-pointer">Descarregar</button>
+          <button id="submitAddBtn" onclick="submitAddModal()" class="px-4 py-1.5 rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-500 cursor-pointer">Descarregar</button>
         </div>
       </div>
     </div>
@@ -598,6 +606,7 @@
       if (isYtUrl(text)) {
         openAddModal("youtube");
         document.getElementById("ytUrl").value = text;
+        onYtUrlInput();
         probeYoutubeUrl();
       } else {
         openAddModal("single");
@@ -960,10 +969,52 @@
     const btn = document.getElementById(`tabBtn-${initialTab}`);
     if (btn) switchAddTab(initialTab, btn);
   }
+  function resetAddModal() {
+    document.getElementById("inUrl").value = "";
+    document.getElementById("inFilename").value = "";
+    document.getElementById("inChecksum").value = "";
+    document.getElementById("ytUrl").value = "";
+    document.getElementById("inCurl").value = "";
+    document.getElementById("inBatch").value = "";
+    document.getElementById("ytPreviewCard").classList.add("hidden");
+    document.getElementById("ytProbeError").classList.add("hidden");
+    const plBox = document.getElementById("ytPlaylistBox");
+    plBox.classList.add("hidden");
+    plBox.classList.remove("flex");
+    document.getElementById("ytPlaylistCheck").checked = false;
+    document.getElementById("ytPlaylistLabel").textContent = "Baixar playlist completa";
+    document.getElementById("ytPlaylistBadge").textContent = "";
+    ytProbeData = null;
+    setYoutubeMode("video");
+  }
+
   function closeAddModal() {
     const m = document.getElementById("addModal");
     m.classList.add("hidden");
     m.classList.remove("flex");
+    resetAddModal();
+  }
+
+  function onYtUrlInput() {
+    const url = (document.getElementById("ytUrl").value || "").trim();
+    const plBox = document.getElementById("ytPlaylistBox");
+    const plCheck = document.getElementById("ytPlaylistCheck");
+    let hasList = false;
+    let isPurePl = false;
+    try {
+      const u = new URL(url);
+      hasList = u.searchParams.has("list");
+      isPurePl = u.pathname.replace(/\/+$/, "").endsWith("/playlist") && hasList;
+    } catch {}
+    if (hasList) {
+      plBox.classList.remove("hidden");
+      plBox.classList.add("flex");
+      if (isPurePl) plCheck.checked = true;
+    } else {
+      plBox.classList.add("hidden");
+      plBox.classList.remove("flex");
+      plCheck.checked = false;
+    }
   }
   function switchAddTab(tab, btn) {
     addTab = tab;
@@ -1053,6 +1104,23 @@
         thumb.classList.add("hidden");
       }
       card.classList.remove("hidden");
+      const plBox = document.getElementById("ytPlaylistBox");
+      const plCheck = document.getElementById("ytPlaylistCheck");
+      if (info.has_playlist) {
+        plBox.classList.remove("hidden");
+        plBox.classList.add("flex");
+        document.getElementById("ytPlaylistLabel").textContent = info.playlist_title
+          ? `Baixar playlist: ${info.playlist_title}`
+          : "Baixar playlist completa";
+        document.getElementById("ytPlaylistBadge").textContent = info.playlist_count
+          ? `${info.playlist_count} itens`
+          : "Playlist";
+        if (info.is_playlist) plCheck.checked = true;
+      } else {
+        plBox.classList.add("hidden");
+        plBox.classList.remove("flex");
+        plCheck.checked = false;
+      }
       setYoutubeMode(ytMode);
     } catch (e) {
       errBox.textContent = "Não foi possível analisar este link: " + e.message;
@@ -1064,6 +1132,9 @@
   }
 
   async function submitAddModal() {
+    const submitBtn = document.getElementById("submitAddBtn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "A iniciar...";
     try {
       if (addTab === "single") {
         const rec = await api("/api/downloads/add", {
@@ -1083,7 +1154,8 @@
         const url = document.getElementById("ytUrl").value.trim();
         const container = document.getElementById("ytContainer").value;
         const qual = document.getElementById("ytQuality").value;
-        const rec = await api("/api/downloads/add", {
+        const downloadPlaylist = document.getElementById("ytPlaylistCheck").checked;
+        const res = await api("/api/downloads/add", {
           method: "POST",
           body: JSON.stringify({
             url,
@@ -1092,11 +1164,18 @@
             container,
             quality: ytMode === "audio" ? "best" : qual,
             audio_bitrate: ytMode === "audio" ? qual : "320",
+            download_playlist: downloadPlaylist,
           }),
         });
-        downloads.set(rec.id, rec);
-        selectDownload(rec.id);
-        renderAll();
+        if (res.downloads && Array.isArray(res.downloads)) {
+          for (const rec of res.downloads) downloads.set(rec.id, rec);
+          if (res.downloads[0]) selectDownload(res.downloads[0].id);
+          renderAll();
+        } else {
+          downloads.set(res.id, res);
+          selectDownload(res.id);
+          renderAll();
+        }
       } else if (addTab === "curl") {
         const rec = await api("/api/downloads/import-curl", {
           method: "POST",
@@ -1115,6 +1194,9 @@
       closeAddModal();
     } catch (e) {
       alert("Erro: " + e.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Descarregar";
     }
   }
 

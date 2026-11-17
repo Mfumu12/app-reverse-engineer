@@ -9,7 +9,7 @@ import shutil
 import time
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from ..config import HyperDLConfig
 from ..db import Database
@@ -27,6 +27,23 @@ def is_youtube_url(url: str) -> bool:
     try:
         host = (urlparse(url.strip()).hostname or "").lower()
         return bool(YOUTUBE_HOST_RE.search(host))
+    except Exception:
+        return False
+
+
+def extract_playlist_id(url: str) -> str:
+    try:
+        qs = parse_qs(urlparse(url.strip()).query)
+        vals = qs.get("list") or []
+        return vals[0].strip() if vals else ""
+    except Exception:
+        return ""
+
+
+def is_pure_playlist_url(url: str) -> bool:
+    try:
+        u = urlparse(url.strip())
+        return is_youtube_url(url) and u.path.rstrip("/").endswith("/playlist") and bool(extract_playlist_id(url))
     except Exception:
         return False
 
@@ -213,10 +230,115 @@ def _extract_probe_info(info: dict[str, Any], ffmpeg_path: str | None) -> dict[s
     }
 
 
+def _default_options_payload(ffmpeg_path: str | None) -> dict[str, Any]:
+    return {
+        "has_ffmpeg": bool(ffmpeg_path),
+        "video_formats": [
+            {"value": "mp4", "label": "MP4 (Universal)"},
+            {"value": "mkv", "label": "MKV (Matroska)"},
+            {"value": "webm", "label": "WebM (VP9/AV1)"},
+        ],
+        "audio_formats": [
+            {"value": "mp3", "label": "MP3 (Áudio universal)"},
+            {"value": "m4a", "label": "M4A (AAC alta qualidade)"},
+            {"value": "opus", "label": "Opus (Original / Leve)"},
+        ],
+        "audio_qualities": [
+            {"value": "320", "label": "320 kbps (Alta)"},
+            {"value": "192", "label": "192 kbps (Média)"},
+            {"value": "128", "label": "128 kbps (Compacta)"},
+        ],
+    }
+
+
+def _extract_playlist_sync(url: str, limit: int = 100) -> dict[str, Any]:
+    import yt_dlp  # type: ignore[import-not-found]
+
+    ydl_opts: dict[str, Any] = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extract_flat": "in_playlist",
+        "noplaylist": False,
+        "playlistend": limit,
+        "ignoreerrors": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    if not isinstance(info, dict):
+        return {"playlist_title": "", "entries": []}
+    raw_entries = info.get("entries") or []
+    entries: list[dict[str, Any]] = []
+    first_thumb = ""
+    for e in raw_entries:
+        if not isinstance(e, dict):
+            continue
+        vid = e.get("id") or ""
+        entry_url = e.get("url") or e.get("webpage_url") or ""
+        if entry_url and not entry_url.startswith("http"):
+            entry_url = f"https://www.youtube.com/watch?v={entry_url}"
+        elif not entry_url and vid:
+            entry_url = f"https://www.youtube.com/watch?v={vid}"
+        if not entry_url:
+            continue
+        thumbs = e.get("thumbnails") or []
+        if not first_thumb and thumbs and isinstance(thumbs, list):
+            first_thumb = thumbs[-1].get("url") or ""
+        entries.append({
+            "id": vid,
+            "url": entry_url,
+            "title": e.get("title") or vid or "Vídeo",
+            "duration_text": _fmt_duration(e.get("duration")),
+        })
+    if not first_thumb:
+        p_thumbs = info.get("thumbnails") or []
+        if p_thumbs and isinstance(p_thumbs, list):
+            first_thumb = p_thumbs[-1].get("url") or ""
+    return {
+        "playlist_title": info.get("title") or "Playlist YouTube",
+        "uploader": info.get("uploader") or info.get("channel") or "",
+        "thumbnail": first_thumb,
+        "entries": entries,
+    }
+
+
+async def expand_youtube_playlist(url: str, limit: int = 100) -> dict[str, Any]:
+    return await asyncio.to_thread(_extract_playlist_sync, url, limit)
+
+
 def probe_youtube_sync(url: str) -> dict[str, Any]:
     import yt_dlp  # type: ignore[import-not-found]
 
     ffmpeg_path = get_ffmpeg_path()
+    list_id = extract_playlist_id(url)
+
+    if is_pure_playlist_url(url):
+        pl = _extract_playlist_sync(url, limit=100)
+        labels = [
+            {"value": "best", "label": "Melhor disponível", "estimated_size": 0},
+            {"value": "2160", "label": "2160p (4K UHD)", "estimated_size": 0},
+            {"value": "1440", "label": "1440p (2K QHD)", "estimated_size": 0},
+            {"value": "1080", "label": "1080p (Full HD)", "estimated_size": 0},
+            {"value": "720", "label": "720p (HD)", "estimated_size": 0},
+            {"value": "480", "label": "480p (SD)", "estimated_size": 0},
+            {"value": "360", "label": "360p", "estimated_size": 0},
+        ]
+        return {
+            "title": pl["playlist_title"] or "Playlist YouTube",
+            "uploader": pl.get("uploader") or "YouTube Playlist",
+            "duration": 0,
+            "duration_text": f"{len(pl['entries'])} itens",
+            "thumbnail": pl.get("thumbnail") or "",
+            "webpage_url": url,
+            "is_playlist": True,
+            "has_playlist": True,
+            "playlist_id": list_id,
+            "playlist_title": pl["playlist_title"],
+            "playlist_count": len(pl["entries"]),
+            "video_qualities": labels,
+            **_default_options_payload(ffmpeg_path),
+        }
+
     ydl_opts: dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
@@ -228,7 +350,21 @@ def probe_youtube_sync(url: str) -> dict[str, Any]:
         info = ydl.extract_info(url, download=False)
     if not isinstance(info, dict):
         raise ValueError("Não foi possível obter informações do vídeo.")
-    return _extract_probe_info(info, ffmpeg_path)
+    res = _extract_probe_info(info, ffmpeg_path)
+    res["is_playlist"] = False
+    res["has_playlist"] = bool(list_id)
+    res["playlist_id"] = list_id
+    res["playlist_title"] = ""
+    res["playlist_count"] = 0
+    if list_id:
+        try:
+            pl = _extract_playlist_sync(url, limit=100)
+            if pl["entries"]:
+                res["playlist_title"] = pl["playlist_title"]
+                res["playlist_count"] = len(pl["entries"])
+        except Exception:
+            pass
+    return res
 
 
 async def probe_youtube(url: str) -> dict[str, Any]:

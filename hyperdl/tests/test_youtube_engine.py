@@ -8,6 +8,8 @@ from hyperdl.engine.manager import DownloadManager
 from hyperdl.engine.youtube_engine import (
     _extract_probe_info,
     build_ydl_format_spec,
+    extract_playlist_id,
+    is_pure_playlist_url,
     is_youtube_url,
 )
 from hyperdl.models import Category, DownloadType
@@ -20,6 +22,11 @@ def test_is_youtube_url():
     assert is_youtube_url("https://youtube.com/shorts/xyz")
     assert not is_youtube_url("https://github.com/psf/requests")
     assert not is_youtube_url("https://example.com/video.mp4")
+
+    assert extract_playlist_id("https://www.youtube.com/watch?v=abc&list=PL12345") == "PL12345"
+    assert extract_playlist_id("https://www.youtube.com/playlist?list=RD999") == "RD999"
+    assert is_pure_playlist_url("https://www.youtube.com/playlist?list=PL12345")
+    assert not is_pure_playlist_url("https://www.youtube.com/watch?v=abc&list=PL12345")
 
 
 def test_build_ydl_format_spec_video_and_audio():
