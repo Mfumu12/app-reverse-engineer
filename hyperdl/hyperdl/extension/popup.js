@@ -51,7 +51,7 @@ async function checkServer(baseUrl) {
 }
 
 chrome.storage.local.get(
-  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: false },
+  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: true },
   (res) => {
     serverInput.value = res.serverUrl;
     keyInput.value = res.apiKey;

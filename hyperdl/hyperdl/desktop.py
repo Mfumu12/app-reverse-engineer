@@ -20,6 +20,26 @@ from .engine.manager import DownloadManager
 from .server import EXT_DIR, STATIC_DIR, HyperDLServer
 
 
+_active_window: Any = None
+
+
+def focus_desktop_window() -> bool:
+    win = _active_window
+    if win is None:
+        return False
+    try:
+        win.restore()
+        win.show()
+        try:
+            win.on_top = True
+            win.on_top = False
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
 def _ensure_stdio_streams(data_dir: Path) -> None:
     """When frozen with console=False on Windows, stdout/stderr are None."""
     if sys.stdout is not None and sys.stderr is not None:
@@ -105,9 +125,10 @@ def run_desktop_app(config: HyperDLConfig | None = None) -> int:
     # Open native desktop window via pywebview (Edge WebView2 on Windows)
     try:
         import webview  # type: ignore[import-not-found]
+        global _active_window
 
         icon_path = STATIC_DIR / "genniusdm.ico"
-        webview.create_window(
+        _active_window = webview.create_window(
             title=f"Gennius DM {__version__}",
             url=url,
             width=1240,

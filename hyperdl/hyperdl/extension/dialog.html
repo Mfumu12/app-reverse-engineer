@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <title>Gennius DM — Nova Transferência</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #0b0d11;
+      color: #e4e4e7;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 12.5px;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #27272a;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 13.5px;
+      color: #f4f4f5;
+    }
+    .brand img { width: 18px; height: 18px; border-radius: 4px; }
+    .size-badge {
+      font-family: monospace;
+      font-size: 11px;
+      color: #93c5fd;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(37, 99, 235, 0.35);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      color: #a1a1aa;
+      margin: 8px 0 4px;
+    }
+    input, select {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid #27272a;
+      background: #11141b;
+      color: #f4f4f5;
+      font-size: 12px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #2563eb; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .err {
+      margin-top: 8px;
+      padding: 7px 9px;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+      font-size: 11.5px;
+      display: none;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #27272a;
+    }
+    button {
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid #27272a;
+      background: #161a23;
+      color: #d4d4d8;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { background: #1f2430; }
+    button.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+    button.primary:hover { background: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div class="brand">
+      <img src="icon48.png" alt="Gennius DM" />
+      <span>Transferir com Gennius DM</span>
+    </div>
+    <span id="sizeBadge" class="size-badge">Tamanho auto</span>
+  </div>
+
+  <label for="dlUrl">Endereço (URL)</label>
+  <input id="dlUrl" type="text" />
+
+  <label for="dlName">Nome do ficheiro</label>
+  <input id="dlName" type="text" placeholder="Deteção automática" />
+
+  <div class="grid">
+    <div>
+      <label for="dlConns">Ligações</label>
+      <select id="dlConns">
+        <option value="4">4 ligações</option>
+        <option value="8" selected>8 ligações (Padrão)</option>
+        <option value="16">16 ligações (Máximo)</option>
+      </select>
+    </div>
+    <div>
+      <label for="dlQueue">Fila</label>
+      <select id="dlQueue">
+        <option value="main">Main Queue</option>
+        <option value="video">Video &amp; Streams</option>
+        <option value="batch">Batch Queue</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="errBox" class="err"></div>
+
+  <div class="actions">
+    <button id="cancelBtn">Cancelar</button>
+    <button id="startBtn" class="primary">Descarregar</button>
+  </div>
+
+  <script src="dialog.js"></script>
+</body>
+</html>

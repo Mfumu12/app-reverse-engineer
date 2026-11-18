@@ -157,6 +157,7 @@ class HyperDLServer:
         app.router.add_get("/api/extension/status", self.handle_extension_status)
         app.router.add_post("/api/extension/install", self.handle_extension_install)
         app.router.add_post("/api/youtube/probe", self.handle_youtube_probe)
+        app.router.add_post("/api/desktop/focus", self.handle_desktop_focus)
 
         # Built-in Range & HLS Benchmark/Demo endpoints
         app.router.add_post("/api/demo/start", self.handle_demo_start)
@@ -493,6 +494,13 @@ class HyperDLServer:
             return web.json_response(info)
         except Exception as exc:
             raise web.HTTPBadRequest(text=json.dumps({"error": str(exc)}), content_type="application/json")
+
+    async def handle_desktop_focus(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        from .desktop import focus_desktop_window
+
+        focused = focus_desktop_window()
+        return web.json_response({"focused": focused})
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 
