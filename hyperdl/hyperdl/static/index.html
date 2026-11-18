@@ -62,10 +62,20 @@
 
       <div class="h-5 w-px bg-zinc-800 mx-1 hidden sm:block"></div>
 
+      <button onclick="resumeAllDownloads()"
+        class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Retomar todos os downloads em pausa">
+        <span class="hidden xl:inline">Retomar tudo</span>
+        <span class="xl:hidden">▶</span>
+      </button>
       <button onclick="pauseAllDownloads()"
         class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Pausar todos os downloads">
         <span class="hidden xl:inline">Pausar tudo</span>
         <span class="xl:hidden">⏸</span>
+      </button>
+      <button onclick="clearCompletedDownloads()"
+        class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Limpar concluídos da lista (mantém os ficheiros no disco)">
+        <span class="hidden xl:inline">Limpar</span>
+        <span class="xl:hidden">🧹</span>
       </button>
       <button onclick="openDownloadsFolder()"
         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Abrir pasta de downloads">
@@ -493,8 +503,12 @@
       <div class="p-4 space-y-3">
         <div>
           <label class="block text-[11px] text-zinc-400 mb-1">Diretório de Destino</label>
-          <input id="setDir" type="text"
-            class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500" />
+          <div class="flex gap-2">
+            <input id="setDir" type="text"
+              class="flex-1 px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500" />
+            <button type="button" onclick="pickSettingsFolder()"
+              class="px-2.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 cursor-pointer shrink-0">Procurar...</button>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
@@ -512,6 +526,28 @@
           <input id="setAutoCat" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
           <span>Organizar automaticamente em subpastas (Vídeos, Músicas, Programas...)</span>
         </label>
+        <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+          <input id="setClipMonitor" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
+          <span>Monitorizar área de transferência (Ctrl+C em links)</span>
+        </label>
+        <div class="p-2.5 rounded-md bg-[#0b0d11] border border-zinc-800 space-y-2">
+          <label class="flex items-center gap-2 text-xs text-zinc-200 cursor-pointer">
+            <input id="setSchedEnabled" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
+            <span>Agendador por horário</span>
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-zinc-400 mb-0.5">Iniciar fila às</label>
+              <input id="setSchedStart" type="time" value="01:00"
+                class="w-full px-2 py-1 rounded bg-[#141821] border border-zinc-700 text-xs text-zinc-100" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-zinc-400 mb-0.5">Pausar fila às</label>
+              <input id="setSchedStop" type="time" value="07:00"
+                class="w-full px-2 py-1 rounded bg-[#141821] border border-zinc-700 text-xs text-zinc-100" />
+            </div>
+          </div>
+        </div>
         <div>
           <label class="block text-[11px] text-zinc-400 mb-1">Ação após concluir todos os downloads</label>
           <select id="setPostAction"
@@ -523,11 +559,14 @@
           </select>
         </div>
         <div class="p-2.5 rounded-md bg-[#0b0d11] border border-zinc-800 flex items-center justify-between gap-2 text-[11px]">
-          <div>
+          <div class="min-w-0">
             <span class="text-zinc-400">Motor YouTube (yt-dlp):</span>
             <span id="ytdlpVerBadge" class="font-mono text-zinc-200 ml-1">—</span>
           </div>
-          <button type="button" onclick="checkYtdlpStatus()" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 cursor-pointer">Verificar</button>
+          <div class="flex gap-1.5 shrink-0">
+            <button type="button" onclick="checkYtdlpStatus()" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 cursor-pointer">Verificar</button>
+            <button id="ytdlpUpdBtn" type="button" onclick="updateYtdlpNow()" class="px-2 py-1 rounded bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 border border-blue-500/40 cursor-pointer">Atualizar</button>
+          </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer">Fechar</button>
@@ -848,7 +887,7 @@
       const isActive = ["downloading", "probing", "assembling", "queued"].includes(d.status);
       const stInfo = STATUS_MAP[d.status] || { label: d.status, cls: "bg-zinc-800 text-zinc-300 border-zinc-700" };
       const barColor = d.status === 'completed' ? 'bg-emerald-500' : d.status === 'paused' ? 'bg-amber-500' : d.status === 'error' ? 'bg-rose-500' : 'bg-blue-500';
-      return `<tr class="cursor-pointer transition ${selectedId === d.id ? 'bg-blue-500/10' : 'hover:bg-[#131720]'}" onclick="selectDownload('${esc(d.id)}')">
+      return `<tr class="cursor-pointer transition ${selectedId === d.id ? 'bg-blue-500/10' : 'hover:bg-[#131720]'}" onclick="selectDownload('${esc(d.id)}')" ondblclick="${d.status === 'completed' ? `openFileDl('${esc(d.id)}')` : ''}">
         <td class="px-4 py-2">
           <div class="font-medium text-zinc-100 max-w-xs truncate" title="${esc(d.filename)}">${esc(d.filename)}</div>
           <div class="text-[11px] text-zinc-500 max-w-xs truncate" title="${esc(d.url)}">${esc(d.download_type.toUpperCase())} · ${esc(d.url)}</div>
@@ -874,8 +913,14 @@
         <td class="px-4 py-2 text-right whitespace-nowrap space-x-1" onclick="event.stopPropagation()">
           ${isActive
             ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="pauseDl('${esc(d.id)}')" title="Pausar">Pausar</button>`
-            : (d.status !== 'completed' ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="resumeDl('${esc(d.id)}')" title="Retomar">Retomar</button>` : '')}
-          ${d.status === 'completed' ? `<a class="inline-block px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-emerald-400 text-[11px]" href="/api/downloads/${esc(d.id)}/file" title="Guardar ficheiro">Abrir</a>` : ''}
+            : (d.status !== 'completed'
+                ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="resumeDl('${esc(d.id)}')" title="Retomar">Retomar</button>
+                   <button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-blue-300 text-[11px] cursor-pointer" onclick="refreshUrlDl('${esc(d.id)}')" title="Atualizar URL expirado">URL</button>`
+                : '')}
+          ${d.status === 'completed'
+            ? `<button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-emerald-400 text-[11px] cursor-pointer" onclick="openFileDl('${esc(d.id)}')" title="Abrir ficheiro">Abrir</button>
+               <button class="px-2 py-1 rounded bg-[#161a23] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[11px] cursor-pointer" onclick="revealDl('${esc(d.id)}')" title="Mostrar na pasta">Pasta</button>`
+            : ''}
           <button class="px-2 py-1 rounded bg-[#161a23] hover:bg-rose-950/50 border border-zinc-800 hover:border-rose-900/60 text-zinc-400 hover:text-rose-300 text-[11px] cursor-pointer" onclick="deleteDl('${esc(d.id)}')" title="Remover">✕</button>
         </td>
       </tr>`;
@@ -973,6 +1018,28 @@
   async function pauseDl(id) { await api(`/api/downloads/${id}/pause`, { method: "POST" }); }
   async function resumeDl(id) { await api(`/api/downloads/${id}/resume`, { method: "POST" }); }
   async function deleteDl(id) { await api(`/api/downloads/${id}?delete_file=true`, { method: "DELETE" }); }
+  async function openFileDl(id) {
+    try { await api(`/api/downloads/${id}/open-file`, { method: "POST" }); }
+    catch { window.open(`/api/downloads/${id}/file`, "_blank"); }
+  }
+  async function revealDl(id) {
+    try { await api(`/api/downloads/${id}/reveal`, { method: "POST" }); } catch {}
+  }
+  async function refreshUrlDl(id) {
+    const d = downloads.get(id);
+    const next = prompt("Cola o novo link para retomar este download do ponto atual:", d ? d.url : "");
+    if (!next || !next.trim()) return;
+    try {
+      const rec = await api(`/api/downloads/${id}/refresh-url`, {
+        method: "POST",
+        body: JSON.stringify({ url: next.trim(), resume: true }),
+      });
+      downloads.set(rec.id, rec);
+      renderAll();
+    } catch (e) {
+      alert("Erro ao atualizar URL: " + e.message);
+    }
+  }
   function pauseSelected() { if (selectedId) pauseDl(selectedId); }
   function resumeSelected() { if (selectedId) resumeDl(selectedId); }
   function deleteSelected() { if (selectedId) deleteDl(selectedId); }
@@ -1268,8 +1335,22 @@
     await api("/api/downloads/pause-all", { method: "POST" });
     await loadSnapshot();
   }
+  async function resumeAllDownloads() {
+    await api("/api/downloads/resume-all", { method: "POST" });
+    await loadSnapshot();
+  }
+  async function clearCompletedDownloads() {
+    await api("/api/downloads/clear-completed", { method: "POST" });
+    await loadSnapshot();
+  }
   async function openDownloadsFolder() {
     await api("/api/system/open-downloads", { method: "POST" });
+  }
+  async function pickSettingsFolder() {
+    try {
+      const r = await api("/api/system/pick-folder", { method: "POST" });
+      if (r && r.path) document.getElementById("setDir").value = r.path;
+    } catch {}
   }
   async function checkYtdlpStatus() {
     const el = document.getElementById("ytdlpVerBadge");
@@ -1283,6 +1364,21 @@
       el.textContent = "Indisponível";
     }
   }
+  async function updateYtdlpNow() {
+    const btn = document.getElementById("ytdlpUpdBtn");
+    const el = document.getElementById("ytdlpVerBadge");
+    btn.disabled = true;
+    btn.textContent = "A atualizar...";
+    try {
+      const res = await api("/api/system/ytdlp-update", { method: "POST" });
+      el.textContent = `${res.version} (atualizada!)`;
+    } catch (e) {
+      alert("Erro ao atualizar yt-dlp: " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Atualizar";
+    }
+  }
 
   async function openSettingsModal() {
     const s = await api("/api/settings");
@@ -1290,6 +1386,10 @@
     document.getElementById("setConns").value = s.default_connections || 8;
     document.getElementById("setLimit").value = s.global_speed_limit_kbps || 0;
     document.getElementById("setAutoCat").checked = Boolean(s.auto_categorize);
+    document.getElementById("setClipMonitor").checked = s.clipboard_monitor !== false;
+    document.getElementById("setSchedEnabled").checked = Boolean(s.schedule_enabled);
+    document.getElementById("setSchedStart").value = s.schedule_start || "01:00";
+    document.getElementById("setSchedStop").value = s.schedule_stop || "07:00";
     document.getElementById("setPostAction").value = s.post_complete_action || "none";
     const m = document.getElementById("settingsModal");
     m.classList.remove("hidden");
@@ -1309,12 +1409,40 @@
         default_connections: Number(document.getElementById("setConns").value),
         global_speed_limit_kbps: Number(document.getElementById("setLimit").value),
         auto_categorize: document.getElementById("setAutoCat").checked,
+        clipboard_monitor: document.getElementById("setClipMonitor").checked,
+        schedule_enabled: document.getElementById("setSchedEnabled").checked,
+        schedule_start: document.getElementById("setSchedStart").value || "01:00",
+        schedule_stop: document.getElementById("setSchedStop").value || "07:00",
         post_complete_action: document.getElementById("setPostAction").value,
       }),
     });
     await loadSnapshot();
     closeSettingsModal();
   }
+
+  let lastClipboardUrl = "";
+  async function checkClipboardForUrl() {
+    if (settings.clipboard_monitor === false) return;
+    if (!document.getElementById("addModal").classList.contains("hidden")) return;
+    try {
+      const res = await api("/api/system/clipboard");
+      const txt = (res && res.text ? res.text : "").trim();
+      if (!txt || txt === lastClipboardUrl || txt.includes("\n") || !/^https?:\/\/\S+$/i.test(txt)) return;
+      const isYt = /(youtube\.com|youtu\.be|music\.youtube\.com)/i.test(txt);
+      const isFile = /\.(zip|rar|7z|exe|msi|iso|mp4|mkv|webm|mp3|pdf|tar|gz|apk|dmg)(\?|$)/i.test(txt);
+      if (!isYt && !isFile) return;
+      lastClipboardUrl = txt;
+      if (isYt) {
+        openAddModal("youtube");
+        document.getElementById("ytUrl").value = txt;
+        onYtUrlInput();
+      } else {
+        openAddModal("single");
+        document.getElementById("inUrl").value = txt;
+      }
+    } catch {}
+  }
+  window.addEventListener("focus", checkClipboardForUrl);
 
   async function openExtModal() {
     const m = document.getElementById("extModal");

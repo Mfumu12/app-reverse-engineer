@@ -69,6 +69,48 @@ def test_server_api_and_demo_download(tmp_path: Path):
                 v = await r.json()
                 assert len(v["digest"]) == 64
 
+            # Settings update including scheduler & clipboard monitor
+            async with client.put(
+                f"{base}/api/settings",
+                json={
+                    "auto_categorize": True,
+                    "clipboard_monitor": False,
+                    "schedule_enabled": True,
+                    "schedule_start": "02:00",
+                    "schedule_stop": "06:30",
+                },
+            ) as r:
+                assert r.status == 200
+                s = await r.json()
+                assert s["auto_categorize"] is True
+                assert s["clipboard_monitor"] is False
+                assert s["schedule_enabled"] is True
+                assert s["schedule_start"] == "02:00"
+                assert s["schedule_stop"] == "06:30"
+
+            # Refresh URL on paused download
+            async with client.post(
+                f"{base}/api/downloads/add",
+                json={"url": "https://example.com/old.zip", "auto_start": False},
+            ) as r:
+                assert r.status == 201
+                paused_id = (await r.json())["id"]
+
+            async with client.post(
+                f"{base}/api/downloads/{paused_id}/refresh-url",
+                json={"url": "https://example.com/new.zip", "resume": False},
+            ) as r:
+                assert r.status == 200
+                refreshed = await r.json()
+                assert refreshed["url"] == "https://example.com/new.zip"
+
+            # Clear completed keeps file on disk and removes completed row
+            async with client.post(f"{base}/api/downloads/clear-completed") as r:
+                assert r.status == 200
+                cl = await r.json()
+                assert cl["cleared"] >= 1
+            assert Path(cur["file_path"]).exists()
+
         await runner.cleanup()
 
     asyncio.run(run())

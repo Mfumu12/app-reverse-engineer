@@ -273,7 +273,7 @@ def _default_options_payload(ffmpeg_path: str | None) -> dict[str, Any]:
 
 
 def _extract_playlist_sync(url: str, limit: int = 100) -> dict[str, Any]:
-    import yt_dlp  # type: ignore[import-not-found]
+    yt_dlp = _import_ytdlp()
 
     ydl_opts: dict[str, Any] = {
         "quiet": True,
@@ -328,7 +328,7 @@ async def expand_youtube_playlist(url: str, limit: int = 100) -> dict[str, Any]:
 
 
 def probe_youtube_sync(url: str) -> dict[str, Any]:
-    import yt_dlp  # type: ignore[import-not-found]
+    yt_dlp = _import_ytdlp()
 
     ffmpeg_path = get_ffmpeg_path()
     list_id = extract_playlist_id(url)
@@ -464,7 +464,7 @@ class YoutubeDownloadJob:
             seg.speed_bps = speed
 
     def _run_sync(self) -> DownloadRecord:
-        import yt_dlp  # type: ignore[import-not-found]
+        yt_dlp = _import_ytdlp()
 
         opts = dict(self.record.media_options or {})
         media_mode = str(opts.get("media_mode", "video")).lower()

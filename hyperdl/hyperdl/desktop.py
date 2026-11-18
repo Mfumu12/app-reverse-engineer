@@ -25,20 +25,53 @@ from .server import EXT_DIR, STATIC_DIR, HyperDLServer
 
 
 _active_window: Any = None
+_tray_icon: Any = None
+_window_hidden: bool = False
 
 
 def focus_desktop_window() -> bool:
+    global _window_hidden
     win = _active_window
     if win is None:
         return False
     try:
         win.restore()
         win.show()
+        _window_hidden = False
         try:
             win.on_top = True
             win.on_top = False
         except Exception:
             pass
+        return True
+    except Exception:
+        return False
+
+
+def pick_folder_dialog(initial_dir: str = "") -> str | None:
+    win = _active_window
+    if win is None:
+        return None
+    try:
+        import webview  # type: ignore[import-not-found]
+
+        dlg_type = getattr(getattr(webview, "FileDialog", None), "FOLDER", None) or getattr(
+            webview, "FOLDER_DIALOG", 20
+        )
+        res = win.create_file_dialog(dlg_type, directory=initial_dir or "")
+        if res and len(res) > 0:
+            return str(res[0])
+        return None
+    except Exception:
+        return None
+
+
+def notify_desktop(title: str, message: str) -> bool:
+    icon = _tray_icon
+    if icon is None or not _window_hidden:
+        return False
+    try:
+        icon.notify(message, title)
         return True
     except Exception:
         return False
@@ -75,6 +108,13 @@ def _start_background_server(config: HyperDLConfig) -> tuple[threading.Thread, d
 
         async def _boot() -> None:
             mgr = DownloadManager(config)
+
+            def _on_mgr_event(ev: str, payload: Any) -> None:
+                if ev == "download_update" and isinstance(payload, dict) and payload.get("status") == "completed":
+                    fname = str(payload.get("filename") or "Download")
+                    notify_desktop("Gennius DM — Concluído", fname)
+
+            mgr.add_listener(_on_mgr_event)
             srv = HyperDLServer(mgr)
             runner = web.AppRunner(srv.create_app())
             await runner.setup()
@@ -149,7 +189,7 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
     tray_icon: Any = None
     try:
         import webview  # type: ignore[import-not-found]
-        global _active_window
+        global _active_window, _tray_icon, _window_hidden
 
         icon_path = STATIC_DIR / "genniusdm.ico"
         win = webview.create_window(
@@ -162,6 +202,7 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
             hidden=hidden,
         )
         _active_window = win
+        _window_hidden = bool(hidden)
         force_quit = {"value": False}
 
         def _post_action(path: str) -> None:
@@ -204,13 +245,16 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
                 pystray.MenuItem("Sair do Gennius DM", _on_tray_quit),
             )
             tray_icon = pystray.Icon("GenniusDM", tray_img, f"Gennius DM {__version__}", tray_menu)
+            _tray_icon = tray_icon
             tray_icon.run_detached()
 
             def _on_closing() -> bool:
+                global _window_hidden
                 if force_quit["value"]:
                     return True
                 try:
                     win.hide()
+                    _window_hidden = True
                     return False
                 except Exception:
                     return True
@@ -239,6 +283,7 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
             except KeyboardInterrupt:
                 pass
     finally:
+        _tray_icon = None
         if tray_icon is not None:
             try:
                 tray_icon.stop()

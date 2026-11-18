@@ -135,9 +135,13 @@ class HyperDLServer:
         app.router.add_post("/api/downloads/add-batch", self.handle_add_batch)
         app.router.add_post("/api/downloads/pause-all", self.handle_pause_all)
         app.router.add_post("/api/downloads/resume-all", self.handle_resume_all)
+        app.router.add_post("/api/downloads/clear-completed", self.handle_clear_completed)
         app.router.add_get("/api/downloads/{id}", self.handle_get_download)
         app.router.add_post("/api/downloads/{id}/pause", self.handle_pause)
         app.router.add_post("/api/downloads/{id}/resume", self.handle_resume)
+        app.router.add_post("/api/downloads/{id}/open-file", self.handle_open_file)
+        app.router.add_post("/api/downloads/{id}/reveal", self.handle_reveal_file)
+        app.router.add_post("/api/downloads/{id}/refresh-url", self.handle_refresh_url)
         app.router.add_delete("/api/downloads/{id}", self.handle_delete)
         app.router.add_post("/api/downloads/{id}/verify", self.handle_verify)
         app.router.add_get("/api/downloads/{id}/file", self.handle_serve_file)
@@ -162,7 +166,10 @@ class HyperDLServer:
         app.router.add_post("/api/youtube/probe", self.handle_youtube_probe)
         app.router.add_post("/api/desktop/focus", self.handle_desktop_focus)
         app.router.add_post("/api/system/open-downloads", self.handle_open_downloads)
+        app.router.add_post("/api/system/pick-folder", self.handle_pick_folder)
+        app.router.add_get("/api/system/clipboard", self.handle_clipboard)
         app.router.add_get("/api/system/ytdlp-status", self.handle_ytdlp_status)
+        app.router.add_post("/api/system/ytdlp-update", self.handle_ytdlp_update)
 
         # Built-in Range & HLS Benchmark/Demo endpoints
         app.router.add_post("/api/demo/start", self.handle_demo_start)
@@ -532,6 +539,102 @@ class HyperDLServer:
         count = await self.manager.resume_all()
         return web.json_response({"resumed": count})
 
+    async def handle_clear_completed(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        count = await self.manager.clear_completed()
+        return web.json_response({"cleared": count})
+
+    async def handle_open_file(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        import os
+        import subprocess
+
+        rec = self.manager.get_download(request.match_info["id"], include_segments=False)
+        if not rec or not Path(rec.file_path).exists():
+            raise web.HTTPNotFound(text=json.dumps({"error": "Ficheiro não encontrado no disco"}), content_type="application/json")
+        try:
+            if sys.platform == "win32":
+                os.startfile(rec.file_path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", rec.file_path])
+            else:
+                subprocess.Popen(["xdg-open", rec.file_path])
+            return web.json_response({"opened": True})
+        except Exception as exc:
+            return web.json_response({"opened": False, "error": str(exc)}, status=500)
+
+    async def handle_reveal_file(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        import subprocess
+
+        rec = self.manager.get_download(request.match_info["id"], include_segments=False)
+        if not rec:
+            raise web.HTTPNotFound(text=json.dumps({"error": "Download não encontrado"}), content_type="application/json")
+        fp = Path(rec.file_path)
+        target_dir = str(fp.parent if fp.parent.exists() else self.manager.config.download_dir)
+        try:
+            if sys.platform == "win32":
+                if fp.exists():
+                    subprocess.Popen(["explorer.exe", f"/select,{fp}"])
+                else:
+                    subprocess.Popen(["explorer.exe", target_dir])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(fp)] if fp.exists() else ["open", target_dir])
+            else:
+                subprocess.Popen(["xdg-open", target_dir])
+            return web.json_response({"revealed": True})
+        except Exception as exc:
+            return web.json_response({"revealed": False, "error": str(exc)}, status=500)
+
+    async def handle_refresh_url(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        data = await request.json()
+        new_url = str(data.get("url", "")).strip()
+        try:
+            rec = await self.manager.refresh_download_url(
+                request.match_info["id"],
+                new_url,
+                headers=data.get("headers"),
+                resume=bool(data.get("resume", True)),
+            )
+            if not rec:
+                raise web.HTTPNotFound(text=json.dumps({"error": "Download não encontrado"}), content_type="application/json")
+            return web.json_response(rec.to_dict(include_segments=True))
+        except ValueError as exc:
+            raise web.HTTPBadRequest(text=json.dumps({"error": str(exc)}), content_type="application/json")
+
+    async def handle_pick_folder(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        from .desktop import pick_folder_dialog
+
+        chosen = await asyncio.to_thread(pick_folder_dialog, str(self.manager.config.download_dir))
+        return web.json_response({"path": chosen})
+
+    async def handle_clipboard(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        text = ""
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                user32 = ctypes.windll.user32
+                kernel32 = ctypes.windll.kernel32
+                if user32.OpenClipboard(0):
+                    try:
+                        h = user32.GetClipboardData(13)  # CF_UNICODETEXT
+                        if h:
+                            ptr = kernel32.GlobalLock(h)
+                            if ptr:
+                                try:
+                                    text = ctypes.wstring_at(ptr)
+                                finally:
+                                    kernel32.GlobalUnlock(h)
+                    finally:
+                        user32.CloseClipboard()
+            except Exception:
+                text = ""
+        return web.json_response({"text": text})
+
     async def handle_open_downloads(self, request: web.Request) -> web.Response:
         self._check_auth(request)
         import os
@@ -553,12 +656,11 @@ class HyperDLServer:
     async def handle_ytdlp_status(self, request: web.Request) -> web.Response:
         self._check_auth(request)
         import urllib.request
-        from .engine.youtube_engine import get_ffmpeg_path
+        from .engine.youtube_engine import _import_ytdlp, get_ffmpeg_path
 
         local_ver = "—"
         try:
-            import yt_dlp  # type: ignore[import-not-found]
-
+            yt_dlp = _import_ytdlp()
             local_ver = str(getattr(yt_dlp.version, "__version__", "unknown"))
         except Exception:
             pass
@@ -579,6 +681,16 @@ class HyperDLServer:
             "update_available": bool(latest_ver and local_ver != "—" and latest_ver != local_ver),
             "has_ffmpeg": bool(get_ffmpeg_path()),
         })
+
+    async def handle_ytdlp_update(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        from .engine.youtube_engine import download_ytdlp_override_sync
+
+        try:
+            res = await asyncio.to_thread(download_ytdlp_override_sync)
+            return web.json_response(res)
+        except Exception as exc:
+            raise web.HTTPBadRequest(text=json.dumps({"error": str(exc)}), content_type="application/json")
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 

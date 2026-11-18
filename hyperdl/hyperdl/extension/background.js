@@ -21,10 +21,11 @@ function registerExtensionIdOnce(baseUrl, apiKey) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(["autoCapture", "minSizeKb", "ignoredHosts"], (res) => {
+  chrome.storage.local.get(["autoCapture", "minSizeKb", "captureExts", "ignoredHosts"], (res) => {
     const updates = {};
     if (typeof res.autoCapture !== "boolean") updates.autoCapture = true;
     if (typeof res.minSizeKb !== "number") updates.minSizeKb = 256;
+    if (typeof res.captureExts !== "string") updates.captureExts = "";
     if (typeof res.ignoredHosts !== "string") updates.ignoredHosts = "";
     if (Object.keys(updates).length) chrome.storage.local.set(updates);
   });
@@ -43,8 +44,24 @@ async function getConfig() {
     autoCapture: true,
     apiKey: "",
     minSizeKb: 256,
+    captureExts: "",
     ignoredHosts: ""
   });
+}
+
+function matchesExtFilter(filename, targetUrl, extsRaw) {
+  const clean = (extsRaw || "").trim();
+  if (!clean) return true;
+  const allowed = clean
+    .split(/[\s,;]+/)
+    .map((s) => s.replace(/^\./, "").trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowed.length) return true;
+  const candidate = filename || guessFilename(targetUrl) || "";
+  const dotIdx = candidate.lastIndexOf(".");
+  if (dotIdx < 0) return false;
+  const ext = candidate.slice(dotIdx + 1).toLowerCase();
+  return allowed.includes(ext);
 }
 
 function isIgnoredUrl(targetUrl, ignoredHostsRaw) {
@@ -287,6 +304,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
   if (targetUrl.startsWith("http://127.0.0.1:8787") || targetUrl.startsWith("http://localhost:8787")) return;
   if (isIgnoredUrl(targetUrl, cfg.ignoredHosts)) return;
 
+  const fnameHint = item.filename ? item.filename.split(/[\\/]/).pop() : guessFilename(targetUrl);
+  if (!matchesExtFilter(fnameHint, targetUrl, cfg.captureExts)) return;
+
   const totalBytes = item.totalBytes || item.fileSize || 0;
   const minBytes = Math.max(0, Number(cfg.minSizeKb || 0)) * 1024;
   if (totalBytes > 0 && minBytes > 0 && totalBytes < minBytes) {
@@ -339,6 +359,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const payload = {
       url: msg.url,
       filename: msg.filename || undefined,
+      save_dir: msg.save_dir || undefined,
       save_subdir: msg.save_subdir || undefined,
       max_connections: msg.max_connections || undefined,
       queue_id: msg.queue_id || undefined,
@@ -359,6 +380,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     probeYoutubeOnServer(msg.url)
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (msg.type === "pickFolder") {
+    getConfig()
+      .then(async (cfg) => {
+        const base = (cfg.serverUrl || DEFAULT_SERVER).replace(/\/$/, "");
+        const headers = {};
+        if (cfg.apiKey) headers["X-API-Key"] = cfg.apiKey;
+        const r = await fetch(`${base}/api/system/pick-folder`, { method: "POST", headers });
+        const d = await r.json().catch(() => ({}));
+        sendResponse({ path: d.path || null });
+      })
+      .catch(() => sendResponse({ path: null }));
     return true;
   }
   if (msg.type === "browserFallback" && msg.url) {

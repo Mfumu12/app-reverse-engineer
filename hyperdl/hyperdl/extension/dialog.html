@@ -141,7 +141,13 @@
     <option value="Programas">Programas</option>
     <option value="Documentos">Documentos</option>
     <option value="Compactados">Compactados</option>
+    <option value="__custom__">Escolher outra pasta...</option>
   </select>
+
+  <div id="customDirRow" style="display:none;margin-top:6px;gap:6px;">
+    <input id="dlCustomDir" type="text" placeholder="Ex.: D:\Downloads\Filmes ou subpasta" style="flex:1;" />
+    <button id="browseDirBtn" type="button">Procurar...</button>
+  </div>
 
   <div id="errBox" class="err"></div>
 

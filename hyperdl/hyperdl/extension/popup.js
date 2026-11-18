@@ -2,6 +2,7 @@ const serverInput = document.getElementById("serverUrl");
 const keyInput = document.getElementById("apiKey");
 const capInput = document.getElementById("autoCapture");
 const minSizeInput = document.getElementById("minSizeKb");
+const extsInput = document.getElementById("captureExts");
 const ignoredInput = document.getElementById("ignoredHosts");
 const statusEl = document.getElementById("statusMsg");
 const connPill = document.getElementById("connPill");
@@ -53,12 +54,13 @@ async function checkServer(baseUrl) {
 }
 
 chrome.storage.local.get(
-  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: true, minSizeKb: 256, ignoredHosts: "" },
+  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: true, minSizeKb: 256, captureExts: "", ignoredHosts: "" },
   (res) => {
     serverInput.value = res.serverUrl;
     keyInput.value = res.apiKey;
     capInput.checked = res.autoCapture;
     minSizeInput.value = String(res.minSizeKb ?? 256);
+    extsInput.value = res.captureExts || "";
     ignoredInput.value = res.ignoredHosts || "";
     checkServer(res.serverUrl);
   }
@@ -159,8 +161,9 @@ document.getElementById("save").onclick = async () => {
   const apiKey = keyInput.value.trim();
   const autoCapture = capInput.checked;
   const minSizeKb = Number(minSizeInput.value || 256);
+  const captureExts = extsInput.value.trim();
   const ignoredHosts = ignoredInput.value.trim();
-  await chrome.storage.local.set({ serverUrl, apiKey, autoCapture, minSizeKb, ignoredHosts });
+  await chrome.storage.local.set({ serverUrl, apiKey, autoCapture, minSizeKb, captureExts, ignoredHosts });
   const ok = await checkServer(serverUrl);
   statusEl.style.color = ok ? "#34d399" : "#f87171";
   statusEl.textContent = ok ? "Configuração guardada e ligada." : "Guardado, mas servidor offline.";

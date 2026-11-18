@@ -55,6 +55,11 @@ class DownloadManager:
             self.config.download_dir.mkdir(parents=True, exist_ok=True)
         self.auto_categorize = self.db.get_setting("auto_categorize", "0") == "1"
         self.post_complete_action = self.db.get_setting("post_complete_action", "none") or "none"
+        self.clipboard_monitor = self.db.get_setting("clipboard_monitor", "1") == "1"
+        self.schedule_enabled = self.db.get_setting("schedule_enabled", "0") == "1"
+        self.schedule_start = self.db.get_setting("schedule_start", "01:00") or "01:00"
+        self.schedule_stop = self.db.get_setting("schedule_stop", "07:00") or "07:00"
+        self._last_sched_minute = ""
 
         self.global_limiter = TokenBucketLimiter(self.config.global_speed_limit_kbps)
         self._session: aiohttp.ClientSession | None = None
@@ -62,6 +67,7 @@ class DownloadManager:
         self._tasks: dict[str, asyncio.Task[DownloadRecord]] = {}
         self._listeners: list[Callable[[str, Any], None]] = []
         self._schedule_lock = asyncio.Lock()
+        self._scheduler_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         if self._session is None or self._session.closed:
@@ -72,9 +78,15 @@ class DownloadManager:
             )
             connector = aiohttp.TCPConnector(limit=128, limit_per_host=32, enable_cleanup_closed=True)
             self._session = aiohttp.ClientSession(timeout=timeout, connector=connector)
+        if self._scheduler_task is None or self._scheduler_task.done():
+            self._scheduler_task = asyncio.create_task(self._scheduler_loop())
         await self.schedule_queues()
 
     async def stop(self) -> None:
+        if self._scheduler_task is not None:
+            self._scheduler_task.cancel()
+            await asyncio.gather(self._scheduler_task, return_exceptions=True)
+            self._scheduler_task = None
         for job in list(self._jobs.values()):
             job.request_pause()
         if self._tasks:
@@ -84,6 +96,25 @@ class DownloadManager:
         if self._session and not self._session.closed:
             await self._session.close()
         self.db.close()
+
+    async def _scheduler_loop(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(15.0)
+                if not self.schedule_enabled:
+                    continue
+                now_hm = time.strftime("%H:%M")
+                if now_hm == self._last_sched_minute:
+                    continue
+                self._last_sched_minute = now_hm
+                if now_hm == self.schedule_start:
+                    await self.resume_all()
+                elif now_hm == self.schedule_stop:
+                    await self.pause_all()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                pass
 
     def add_listener(self, fn: Callable[[str, Any], None]) -> None:
         self._listeners.append(fn)
@@ -131,6 +162,18 @@ class DownloadManager:
             if act in ("none", "open_folder", "sleep", "shutdown"):
                 self.post_complete_action = act
                 self.db.set_setting("post_complete_action", act)
+        if "clipboard_monitor" in data:
+            self.clipboard_monitor = bool(data["clipboard_monitor"])
+            self.db.set_setting("clipboard_monitor", "1" if self.clipboard_monitor else "0")
+        if "schedule_enabled" in data:
+            self.schedule_enabled = bool(data["schedule_enabled"])
+            self.db.set_setting("schedule_enabled", "1" if self.schedule_enabled else "0")
+        if "schedule_start" in data and len(str(data["schedule_start"]).strip()) == 5:
+            self.schedule_start = str(data["schedule_start"]).strip()
+            self.db.set_setting("schedule_start", self.schedule_start)
+        if "schedule_stop" in data and len(str(data["schedule_stop"]).strip()) == 5:
+            self.schedule_stop = str(data["schedule_stop"]).strip()
+            self.db.set_setting("schedule_stop", self.schedule_stop)
         self._notify("settings_update", self.get_settings())
         return self.get_settings()
 
@@ -144,6 +187,10 @@ class DownloadManager:
             "api_key_enabled": bool(self.config.api_key),
             "auto_categorize": self.auto_categorize,
             "post_complete_action": self.post_complete_action,
+            "clipboard_monitor": self.clipboard_monitor,
+            "schedule_enabled": self.schedule_enabled,
+            "schedule_start": self.schedule_start,
+            "schedule_stop": self.schedule_stop,
         }
 
     async def add_download(
@@ -350,6 +397,43 @@ class DownloadManager:
             await self.resume_download(rec.id)
             count += 1
         return count
+
+    async def clear_completed(self) -> int:
+        count = 0
+        for st in (DownloadStatus.COMPLETED.value, DownloadStatus.CANCELLED.value):
+            for rec in self.db.list_downloads(status=st):
+                self.db.delete_download(rec.id)
+                self._notify("download_removed", {"id": rec.id})
+                count += 1
+        return count
+
+    async def refresh_download_url(
+        self,
+        download_id: str,
+        new_url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        resume: bool = True,
+    ) -> DownloadRecord | None:
+        clean_url = new_url.strip()
+        if not clean_url.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        if download_id in self._jobs:
+            await self.pause_download(download_id)
+        rec = self.db.get_download(download_id, include_segments=True)
+        if not rec:
+            return None
+        rec.url = clean_url
+        rec.final_url = clean_url
+        rec.error_message = ""
+        if headers:
+            rec.headers.update(headers)
+        rec.updated_at = time.time()
+        self.db.update_download(rec)
+        self._notify("download_update", rec.to_dict(include_segments=True))
+        if resume:
+            return await self.resume_download(download_id)
+        return rec
 
     def get_download(self, download_id: str, include_segments: bool = True) -> DownloadRecord | None:
         job = self._jobs.get(download_id)
