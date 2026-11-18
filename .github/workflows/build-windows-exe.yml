@@ -7,6 +7,9 @@ on:
       - ".github/workflows/build-windows-exe.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-exe:
     runs-on: windows-latest
@@ -47,3 +50,32 @@ jobs:
           name: GenniusDM-Windows-x64
           path: hyperdl/dist/GenniusDM.exe
           if-no-files-found: error
+
+      - name: Publish public GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "latest-windows"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f $tag "${{ github.sha }}"
+          git push -f origin "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to push tag" }
+          $prevPref = $ErrorActionPreference
+          $ErrorActionPreference = "Continue"
+          gh release view $tag *> $null
+          $releaseExists = ($LASTEXITCODE -eq 0)
+          $ErrorActionPreference = $prevPref
+          if (-not $releaseExists) {
+            gh release create $tag hyperdl/dist/GenniusDM.exe `
+              --title "Gennius DM (Windows x64)" `
+              --notes "Download direto do GenniusDM.exe (build automático Windows x64, commit ${{ github.sha }})." `
+              --latest
+          } else {
+            gh release edit $tag `
+              --title "Gennius DM (Windows x64)" `
+              --notes "Download direto do GenniusDM.exe (build automático Windows x64, commit ${{ github.sha }})." `
+              --latest
+            gh release upload $tag hyperdl/dist/GenniusDM.exe --clobber
+          }
