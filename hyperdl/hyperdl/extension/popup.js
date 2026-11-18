@@ -1,6 +1,8 @@
 const serverInput = document.getElementById("serverUrl");
 const keyInput = document.getElementById("apiKey");
 const capInput = document.getElementById("autoCapture");
+const minSizeInput = document.getElementById("minSizeKb");
+const ignoredInput = document.getElementById("ignoredHosts");
 const statusEl = document.getElementById("statusMsg");
 const connPill = document.getElementById("connPill");
 const quickUrl = document.getElementById("quickUrl");
@@ -51,11 +53,13 @@ async function checkServer(baseUrl) {
 }
 
 chrome.storage.local.get(
-  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: true },
+  { serverUrl: "http://127.0.0.1:8787", apiKey: "", autoCapture: true, minSizeKb: 256, ignoredHosts: "" },
   (res) => {
     serverInput.value = res.serverUrl;
     keyInput.value = res.apiKey;
     capInput.checked = res.autoCapture;
+    minSizeInput.value = String(res.minSizeKb ?? 256);
+    ignoredInput.value = res.ignoredHosts || "";
     checkServer(res.serverUrl);
   }
 );
@@ -108,26 +112,31 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   });
 });
 
-document.getElementById("ytDownload").onclick = async () => {
-  const base = (serverInput.value.trim() || "http://127.0.0.1:8787").replace(/\/$/, "");
-  const headers = { "Content-Type": "application/json" };
-  if (keyInput.value.trim()) headers["X-API-Key"] = keyInput.value.trim();
+document.getElementById("ytDownload").onclick = () => {
   const mode = ytMode.value;
-  const body = {
-    url: activeTabUrl,
-    media_mode: mode,
-    container: ytFormat.value,
-    quality: mode === "audio" ? "best" : ytQuality.value,
-    audio_bitrate: mode === "audio" ? ytQuality.value : "320"
-  };
+  let isPl = false;
   try {
-    const r = await fetch(`${base}/api/downloads/add`, { method: "POST", headers, body: JSON.stringify(body) });
-    statusEl.style.color = r.ok ? "#34d399" : "#f87171";
-    statusEl.textContent = r.ok ? "Download do YouTube iniciado no Gennius DM." : "Erro ao iniciar download.";
-  } catch (e) {
-    statusEl.style.color = "#f87171";
-    statusEl.textContent = "GenniusDM.exe não está aberto.";
-  }
+    isPl = new URL(activeTabUrl).searchParams.has("list") && /\/playlist/i.test(activeTabUrl);
+  } catch {}
+  chrome.runtime.sendMessage(
+    {
+      type: "sendUrl",
+      url: activeTabUrl,
+      media_mode: mode,
+      container: ytFormat.value,
+      quality: mode === "audio" ? "best" : ytQuality.value,
+      audio_bitrate: mode === "audio" ? ytQuality.value : "320",
+      download_playlist: isPl,
+      queue_id: mode === "audio" ? "main" : "video",
+      referer: activeTabUrl
+    },
+    (resp) => {
+      statusEl.style.color = resp && resp.ok ? "#34d399" : "#f87171";
+      statusEl.textContent = resp && resp.ok
+        ? "Download do YouTube iniciado no Gennius DM."
+        : (resp && resp.error) || "Erro ao iniciar download.";
+    }
+  );
 };
 
 document.getElementById("sendQuick").onclick = () => {
@@ -149,7 +158,9 @@ document.getElementById("save").onclick = async () => {
   const serverUrl = serverInput.value.trim() || "http://127.0.0.1:8787";
   const apiKey = keyInput.value.trim();
   const autoCapture = capInput.checked;
-  await chrome.storage.local.set({ serverUrl, apiKey, autoCapture });
+  const minSizeKb = Number(minSizeInput.value || 256);
+  const ignoredHosts = ignoredInput.value.trim();
+  await chrome.storage.local.set({ serverUrl, apiKey, autoCapture, minSizeKb, ignoredHosts });
   const ok = await checkServer(serverUrl);
   statusEl.style.color = ok ? "#34d399" : "#f87171";
   statusEl.textContent = ok ? "Configuração guardada e ligada." : "Guardado, mas servidor offline.";

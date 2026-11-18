@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Gennius DM",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv6l1DXgvoP3X10+l2OutJxU1OzIS+wzpBt+W//KvdUtaqzBCk98Tt+/4AMLXM9TfpMhZTfvYoiFlJ0exdp0Mr8tYppf8XoFW2X5uxOO1Xb8TjYyj/5N9dRICs2OPJjzz95qRoU+NJaDWKbRk+m3fYZUXf1q2aMaCKiW0mrp5WJ1YxVM+o9RVdlJvId6JYlImr8j4BKmhRohgfOVmRqrHwZAwQXlzbWP4OJx0/fpjAEKsMN7ZHhjTG6OCzb5w02SE9wExwhvI03zQQ7BVoJU41T0s/qGqQIn4uSRtdTIYHuOLk1jEjsv8XDPGeUNBO/HMRjeblGD2tLMKWVnndxvQVwIDAQAB",
-  "description": "Gestor e acelerador de downloads com caixa de captura automática e botão de download direto no YouTube (Video/Audio/Playlist).",
+  "description": "Gestor e acelerador de downloads com captura automática, cookies, bandeja do sistema e download direto no YouTube e streams.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -15,6 +15,7 @@
     "storage",
     "webRequest",
     "tabs",
+    "cookies",
     "nativeMessaging"
   ],
   "host_permissions": [
@@ -27,11 +28,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://*.youtube.com/*",
-        "*://youtu.be/*",
-        "*://music.youtube.com/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

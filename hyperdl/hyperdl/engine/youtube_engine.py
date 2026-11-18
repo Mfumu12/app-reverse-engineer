@@ -79,6 +79,8 @@ def build_ydl_format_spec(
     container: str = "mp4",
     audio_bitrate: str = "320",
     has_ffmpeg: bool = True,
+    subtitles: bool = False,
+    embed_metadata: bool = True,
 ) -> dict[str, Any]:
     """Return yt-dlp format string, merge_output_format, and postprocessors."""
     mode = (media_mode or "video").lower()
@@ -89,6 +91,7 @@ def build_ydl_format_spec(
         if cont not in ("mp3", "m4a", "opus", "webm", "wav", "flac"):
             cont = "mp3"
         postprocessors: list[dict[str, Any]] = []
+        write_thumb = False
         if has_ffmpeg:
             codec = "opus" if cont == "webm" else cont
             pp: dict[str, Any] = {
@@ -98,6 +101,11 @@ def build_ydl_format_spec(
             if codec in ("mp3", "m4a", "opus") and str(audio_bitrate).isdigit():
                 pp["preferredquality"] = str(audio_bitrate)
             postprocessors.append(pp)
+            if embed_metadata:
+                postprocessors.append({"key": "FFmpegMetadata", "add_metadata": True})
+                if codec in ("mp3", "m4a", "opus"):
+                    postprocessors.append({"key": "EmbedThumbnail"})
+                    write_thumb = True
             fmt = "bestaudio/best"
         else:
             fmt = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
@@ -106,14 +114,20 @@ def build_ydl_format_spec(
             "merge_output_format": None,
             "postprocessors": postprocessors,
             "target_ext": cont,
+            "writethumbnail": write_thumb,
+            "writesubtitles": False,
         }
 
     # Video + Audio mode
     if cont not in ("mp4", "mkv", "webm"):
         cont = "mp4"
     height_filter = f"[height<={int(q)}]" if q.isdigit() else ""
-
+    video_pps: list[dict[str, Any]] = []
     if has_ffmpeg:
+        if embed_metadata:
+            video_pps.append({"key": "FFmpegMetadata", "add_metadata": True})
+        if subtitles:
+            video_pps.append({"key": "FFmpegEmbedSubtitle"})
         if cont == "mp4":
             fmt = (
                 f"bestvideo{height_filter}[ext=mp4]+bestaudio[ext=m4a]/"
@@ -131,8 +145,10 @@ def build_ydl_format_spec(
         return {
             "format": fmt,
             "merge_output_format": cont,
-            "postprocessors": [],
+            "postprocessors": video_pps,
             "target_ext": cont,
+            "writethumbnail": False,
+            "writesubtitles": bool(subtitles),
         }
 
     # Without FFmpeg fallback: progressive single stream
@@ -142,12 +158,15 @@ def build_ydl_format_spec(
         "merge_output_format": None,
         "postprocessors": [],
         "target_ext": cont,
+        "writethumbnail": False,
+        "writesubtitles": bool(subtitles),
     }
 
 
 def _extract_probe_info(info: dict[str, Any], ffmpeg_path: str | None) -> dict[str, Any]:
     """Normalize yt-dlp extract_info dict into clean UI options."""
     formats = info.get("formats") or []
+    duration_s = float(info.get("duration") or 0)
     best_audio_size = 0
     heights: dict[int, dict[str, Any]] = {}
 
@@ -155,6 +174,8 @@ def _extract_probe_info(info: dict[str, Any], ffmpeg_path: str | None) -> dict[s
         vcodec = f.get("vcodec") or "none"
         acodec = f.get("acodec") or "none"
         size = int(f.get("filesize") or f.get("filesize_approx") or 0)
+        if size <= 0 and duration_s > 0 and f.get("tbr"):
+            size = int(float(f["tbr"]) * 1000.0 / 8.0 * duration_s)
         if vcodec == "none" and acodec != "none":
             if size > best_audio_size:
                 best_audio_size = size
@@ -450,6 +471,8 @@ class YoutubeDownloadJob:
         quality = str(opts.get("quality", "best"))
         container = str(opts.get("container", "mp3" if media_mode == "audio" else "mp4"))
         audio_bitrate = str(opts.get("audio_bitrate", "320"))
+        subtitles = bool(opts.get("subtitles", False))
+        embed_metadata = bool(opts.get("embed_metadata", True))
         ffmpeg_path = get_ffmpeg_path()
 
         spec = build_ydl_format_spec(
@@ -458,6 +481,8 @@ class YoutubeDownloadJob:
             container=container,
             audio_bitrate=audio_bitrate,
             has_ffmpeg=bool(ffmpeg_path),
+            subtitles=subtitles,
+            embed_metadata=embed_metadata,
         )
 
         save_dir = Path(self.record.save_dir)
@@ -533,6 +558,12 @@ class YoutubeDownloadJob:
             ydl_opts["merge_output_format"] = spec["merge_output_format"]
         if spec["postprocessors"]:
             ydl_opts["postprocessors"] = spec["postprocessors"]
+        if spec.get("writethumbnail"):
+            ydl_opts["writethumbnail"] = True
+        if spec.get("writesubtitles"):
+            ydl_opts["writesubtitles"] = True
+            ydl_opts["writeautomaticsub"] = True
+            ydl_opts["subtitleslangs"] = ["pt", "pt-PT", "pt-BR", "en"]
         if self.record.speed_limit_kbps > 0:
             ydl_opts["ratelimit"] = self.record.speed_limit_kbps * 1024
         elif self.config.global_speed_limit_kbps > 0:

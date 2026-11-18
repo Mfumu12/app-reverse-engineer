@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -15,13 +18,22 @@ from ..config import HyperDLConfig
 from ..db import Database
 from ..models import Category, DownloadRecord, DownloadStatus, DownloadType, QueueRecord, detect_category
 from ..utils.checksum import compute_checksum
-from ..utils.filename import extract_filename, part_file_path, resolve_unique_path
+from ..utils.filename import extract_filename, part_file_path, resolve_unique_path, sanitize_filename
 from .hls_engine import HlsDownloadJob
 from .http_engine import HttpDownloadJob
 from .throttle import TokenBucketLimiter
 from .youtube_engine import YoutubeDownloadJob, is_youtube_url
 
 ActiveJob = HttpDownloadJob | HlsDownloadJob | YoutubeDownloadJob
+
+CATEGORY_FOLDERS = {
+    Category.VIDEO.value: "Vídeos",
+    Category.MUSIC.value: "Músicas",
+    Category.PROGRAMS.value: "Programas",
+    Category.DOCUMENTS.value: "Documentos",
+    Category.COMPRESSED.value: "Compactados",
+    Category.OTHER.value: "Outros",
+}
 
 
 class DownloadManager:
@@ -41,6 +53,8 @@ class DownloadManager:
         if saved_dir:
             self.config.download_dir = Path(saved_dir)
             self.config.download_dir.mkdir(parents=True, exist_ok=True)
+        self.auto_categorize = self.db.get_setting("auto_categorize", "0") == "1"
+        self.post_complete_action = self.db.get_setting("post_complete_action", "none") or "none"
 
         self.global_limiter = TokenBucketLimiter(self.config.global_speed_limit_kbps)
         self._session: aiohttp.ClientSession | None = None
@@ -109,6 +123,14 @@ class DownloadManager:
         if "api_key" in data:
             self.config.api_key = str(data["api_key"])
             self.db.set_setting("api_key", self.config.api_key)
+        if "auto_categorize" in data:
+            self.auto_categorize = bool(data["auto_categorize"])
+            self.db.set_setting("auto_categorize", "1" if self.auto_categorize else "0")
+        if "post_complete_action" in data:
+            act = str(data["post_complete_action"]).strip().lower()
+            if act in ("none", "open_folder", "sleep", "shutdown"):
+                self.post_complete_action = act
+                self.db.set_setting("post_complete_action", act)
         self._notify("settings_update", self.get_settings())
         return self.get_settings()
 
@@ -120,6 +142,8 @@ class DownloadManager:
             "global_speed_limit_kbps": self.config.global_speed_limit_kbps,
             "min_split_size": self.config.min_split_size,
             "api_key_enabled": bool(self.config.api_key),
+            "auto_categorize": self.auto_categorize,
+            "post_complete_action": self.post_complete_action,
         }
 
     async def add_download(
@@ -128,6 +152,7 @@ class DownloadManager:
         *,
         filename: str | None = None,
         save_dir: str | None = None,
+        save_subdir: str | None = None,
         queue_id: str = "main",
         max_connections: int | None = None,
         speed_limit_kbps: int | None = None,
@@ -166,9 +191,6 @@ class DownloadManager:
         if headers:
             merged_headers.update(headers)
 
-        target_dir = Path(save_dir) if save_dir else self.config.download_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-
         initial_name = extract_filename(url, suggested_name=filename)
         if dl_type == DownloadType.HLS.value and initial_name.lower().endswith(".m3u8"):
             initial_name = initial_name[:-5] + ".ts"
@@ -176,15 +198,27 @@ class DownloadManager:
             yt_opts = media_options or {}
             ext = str(yt_opts.get("container") or ("mp3" if yt_opts.get("media_mode") == "audio" else "mp4")).lower()
             initial_name = f"youtube_media.{ext}"
+
+        yt_cat = detect_category(initial_name, "", dl_type)
+        if dl_type == DownloadType.YOUTUBE.value:
+            yt_cat = Category.MUSIC.value if (media_options or {}).get("media_mode") == "audio" else Category.VIDEO.value
+
+        target_dir = Path(save_dir) if save_dir else self.config.download_dir
+        if not save_dir:
+            sub = (save_subdir or "").strip()
+            if sub == "auto" or (not sub and self.auto_categorize):
+                target_dir = target_dir / CATEGORY_FOLDERS.get(yt_cat, "Outros")
+            elif sub and sub not in (".", "/", "\\"):
+                clean_parts = [sanitize_filename(p) for p in Path(sub).parts if p not in ("", ".", "..", "/", "\\")]
+                if clean_parts:
+                    target_dir = target_dir.joinpath(*clean_parts)
+        target_dir.mkdir(parents=True, exist_ok=True)
         target_path = resolve_unique_path(target_dir, initial_name)
 
         if not self.db.get_queue(queue_id):
             queue_id = "main"
 
         now = time.time()
-        yt_cat = detect_category(target_path.name, "", dl_type)
-        if dl_type == DownloadType.YOUTUBE.value:
-            yt_cat = Category.MUSIC.value if (media_options or {}).get("media_mode") == "audio" else Category.VIDEO.value
 
         rec = DownloadRecord(
             id=uuid.uuid4().hex[:12],
@@ -267,11 +301,55 @@ class DownloadManager:
 
     async def _run_job(self, download_id: str, job: ActiveJob) -> DownloadRecord:
         try:
-            return await job.run()
+            res = await job.run()
+            return res
         finally:
             self._jobs.pop(download_id, None)
             self._tasks.pop(download_id, None)
             await self.schedule_queues()
+            if not self._jobs and self.post_complete_action != "none":
+                queued_left = self.db.list_downloads(status=DownloadStatus.QUEUED.value)
+                if not queued_left:
+                    self._trigger_post_complete_action()
+
+    def _trigger_post_complete_action(self) -> None:
+        action = self.post_complete_action
+        if action == "none":
+            return
+        # Reset one-shot power actions after triggering so next run won't surprise user
+        if action in ("sleep", "shutdown"):
+            self.post_complete_action = "none"
+            self.db.set_setting("post_complete_action", "none")
+            self._notify("settings_update", self.get_settings())
+        try:
+            if action == "open_folder":
+                if sys.platform == "win32":
+                    os.startfile(str(self.config.download_dir))  # type: ignore[attr-defined]
+            elif action == "sleep" and sys.platform == "win32":
+                subprocess.Popen(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"])
+            elif action == "shutdown" and sys.platform == "win32":
+                subprocess.Popen(["shutdown", "/s", "/t", "60"])
+        except Exception:
+            pass
+
+    async def pause_all(self) -> int:
+        count = 0
+        for dl_id in list(self._jobs.keys()):
+            await self.pause_download(dl_id)
+            count += 1
+        for rec in self.db.list_downloads(status=DownloadStatus.QUEUED.value):
+            rec.status = DownloadStatus.PAUSED.value
+            self.db.update_download(rec)
+            self._notify("download_update", rec.to_dict(include_segments=True))
+            count += 1
+        return count
+
+    async def resume_all(self) -> int:
+        count = 0
+        for rec in self.db.list_downloads(status=DownloadStatus.PAUSED.value):
+            await self.resume_download(rec.id)
+            count += 1
+        return count
 
     def get_download(self, download_id: str, include_segments: bool = True) -> DownloadRecord | None:
         job = self._jobs.get(download_id)

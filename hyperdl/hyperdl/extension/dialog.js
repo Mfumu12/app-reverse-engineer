@@ -3,6 +3,7 @@ const urlInput = document.getElementById("dlUrl");
 const nameInput = document.getElementById("dlName");
 const connsSel = document.getElementById("dlConns");
 const queueSel = document.getElementById("dlQueue");
+const subdirSel = document.getElementById("dlSubdir");
 const sizeBadge = document.getElementById("sizeBadge");
 const errBox = document.getElementById("errBox");
 const startBtn = document.getElementById("startBtn");
@@ -45,6 +46,7 @@ startBtn.onclick = () => {
       type: "sendUrl",
       url,
       filename: nameInput.value.trim() || undefined,
+      save_subdir: subdirSel.value,
       max_connections: Number(connsSel.value || 8),
       queue_id: queueSel.value || "main",
       referer

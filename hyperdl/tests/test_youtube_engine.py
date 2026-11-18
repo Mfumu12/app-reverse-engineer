@@ -33,16 +33,23 @@ def test_build_ydl_format_spec_video_and_audio():
     v_mp4 = build_ydl_format_spec(media_mode="video", quality="1080", container="mp4", has_ffmpeg=True)
     assert "[height<=1080]" in v_mp4["format"]
     assert v_mp4["merge_output_format"] == "mp4"
-    assert v_mp4["postprocessors"] == []
+    assert [p["key"] for p in v_mp4["postprocessors"]] == ["FFmpegMetadata"]
 
-    v_webm = build_ydl_format_spec(media_mode="video", quality="720", container="webm", has_ffmpeg=True)
+    v_sub = build_ydl_format_spec(media_mode="video", quality="1080", container="mp4", has_ffmpeg=True, subtitles=True)
+    assert "FFmpegEmbedSubtitle" in [p["key"] for p in v_sub["postprocessors"]]
+    assert v_sub["writesubtitles"] is True
+
+    v_webm = build_ydl_format_spec(media_mode="video", quality="720", container="webm", has_ffmpeg=True, embed_metadata=False)
     assert "[height<=720]" in v_webm["format"]
     assert v_webm["merge_output_format"] == "webm"
+    assert v_webm["postprocessors"] == []
 
     a_mp3 = build_ydl_format_spec(media_mode="audio", container="mp3", audio_bitrate="320", has_ffmpeg=True)
     assert a_mp3["format"] == "bestaudio/best"
     assert a_mp3["postprocessors"][0]["preferredcodec"] == "mp3"
     assert a_mp3["postprocessors"][0]["preferredquality"] == "320"
+    assert "EmbedThumbnail" in [p["key"] for p in a_mp3["postprocessors"]]
+    assert a_mp3["writethumbnail"] is True
 
     a_m4a = build_ydl_format_spec(media_mode="audio", container="m4a", audio_bitrate="192", has_ffmpeg=True)
     assert a_m4a["postprocessors"][0]["preferredcodec"] == "m4a"
@@ -87,6 +94,13 @@ def test_youtube_download_record_persistence(tmp_path: Path):
         loaded = mgr.db.get_download(rec.id)
         assert loaded is not None
         assert loaded.media_options == {"media_mode": "audio", "container": "mp3", "audio_bitrate": "320"}
+
+        rec2 = await mgr.add_download(
+            "https://example.com/archive.zip",
+            save_subdir="auto",
+            auto_start=False,
+        )
+        assert Path(rec2.save_dir).name == "Compactados"
         mgr.db.close()
 
     asyncio.run(run())

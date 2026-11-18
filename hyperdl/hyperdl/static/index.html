@@ -62,6 +62,17 @@
 
       <div class="h-5 w-px bg-zinc-800 mx-1 hidden sm:block"></div>
 
+      <button onclick="pauseAllDownloads()"
+        class="inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Pausar todos os downloads">
+        <span class="hidden xl:inline">Pausar tudo</span>
+        <span class="xl:hidden">⏸</span>
+      </button>
+      <button onclick="openDownloadsFolder()"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Abrir pasta de downloads">
+        <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span class="hidden lg:inline">Pasta</span>
+      </button>
+
       <button onclick="openAddModal('curl')"
         class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#161a23] hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition cursor-pointer" title="Importar comando cURL ou lote">
         <svg class="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
@@ -358,6 +369,19 @@
                 class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 font-mono focus:outline-none focus:border-blue-500" />
             </div>
           </div>
+          <div>
+            <label class="block text-[11px] text-zinc-400 mb-1">Pasta / Categoria</label>
+            <select id="inSubdir"
+              class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500">
+              <option value="">Padrão (segundo Definições)</option>
+              <option value="auto">Automática por tipo (Vídeos, Músicas, Programas...)</option>
+              <option value="Vídeos">Vídeos</option>
+              <option value="Músicas">Músicas</option>
+              <option value="Programas">Programas</option>
+              <option value="Documentos">Documentos</option>
+              <option value="Compactados">Compactados</option>
+            </select>
+          </div>
         </div>
 
         <div id="tab-curl" class="tab-pane hidden">
@@ -435,6 +459,14 @@
               </select>
             </div>
           </div>
+
+          <label id="ytSubBox" class="flex items-center gap-2 p-2 rounded-md bg-[#0b0d11] border border-zinc-800 text-xs text-zinc-300 cursor-pointer">
+            <input id="ytSubCheck" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
+            <span>Embutir legendas automáticas (PT / EN)</span>
+          </label>
+          <div id="ytAudioMetaHint" class="hidden text-[11px] text-blue-300">
+            Capa do vídeo e metadados ID3 serão embutidos automaticamente no áudio.
+          </div>
         </div>
 
         <div id="tab-batch" class="tab-pane hidden">
@@ -475,6 +507,27 @@
             <input id="setLimit" type="number" min="0"
               class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500" />
           </div>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-zinc-300 pt-1 cursor-pointer">
+          <input id="setAutoCat" type="checkbox" class="rounded border-zinc-600 bg-[#0b0d11]" />
+          <span>Organizar automaticamente em subpastas (Vídeos, Músicas, Programas...)</span>
+        </label>
+        <div>
+          <label class="block text-[11px] text-zinc-400 mb-1">Ação após concluir todos os downloads</label>
+          <select id="setPostAction"
+            class="w-full px-3 py-1.5 rounded-md bg-[#0b0d11] border border-zinc-700 text-xs text-zinc-100 focus:outline-none focus:border-blue-500">
+            <option value="none">Nenhuma</option>
+            <option value="open_folder">Abrir pasta de downloads</option>
+            <option value="sleep">Suspender computador (Windows)</option>
+            <option value="shutdown">Desligar computador em 60s (Windows)</option>
+          </select>
+        </div>
+        <div class="p-2.5 rounded-md bg-[#0b0d11] border border-zinc-800 flex items-center justify-between gap-2 text-[11px]">
+          <div>
+            <span class="text-zinc-400">Motor YouTube (yt-dlp):</span>
+            <span id="ytdlpVerBadge" class="font-mono text-zinc-200 ml-1">—</span>
+          </div>
+          <button type="button" onclick="checkYtdlpStatus()" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 cursor-pointer">Verificar</button>
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer">Fechar</button>
@@ -972,6 +1025,7 @@
   function resetAddModal() {
     document.getElementById("inUrl").value = "";
     document.getElementById("inFilename").value = "";
+    document.getElementById("inSubdir").value = "";
     document.getElementById("inChecksum").value = "";
     document.getElementById("ytUrl").value = "";
     document.getElementById("inCurl").value = "";
@@ -982,6 +1036,7 @@
     plBox.classList.add("hidden");
     plBox.classList.remove("flex");
     document.getElementById("ytPlaylistCheck").checked = false;
+    document.getElementById("ytSubCheck").checked = false;
     document.getElementById("ytPlaylistLabel").textContent = "Baixar playlist completa";
     document.getElementById("ytPlaylistBadge").textContent = "";
     ytProbeData = null;
@@ -1035,8 +1090,12 @@
     const fmtSel = document.getElementById("ytContainer");
     const qSel = document.getElementById("ytQuality");
     const qLbl = document.getElementById("ytQualityLabel");
+    const subBox = document.getElementById("ytSubBox");
+    const audioHint = document.getElementById("ytAudioMetaHint");
 
     if (mode === "audio") {
+      if (subBox) subBox.classList.add("hidden");
+      if (audioHint) audioHint.classList.remove("hidden");
       btnA.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer";
       btnV.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer";
       qLbl.textContent = "Qualidade de áudio";
@@ -1053,6 +1112,8 @@
       ];
       qSel.innerHTML = aQuals.map(q => `<option value="${esc(q.value)}">${esc(q.label)}</option>`).join("");
     } else {
+      if (subBox) subBox.classList.remove("hidden");
+      if (audioHint) audioHint.classList.add("hidden");
       btnV.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/40 cursor-pointer";
       btnA.className = "px-3 py-1.5 rounded-md text-xs font-medium bg-[#0b0d11] text-zinc-400 border border-zinc-800 hover:text-zinc-200 cursor-pointer";
       qLbl.textContent = "Qualidade de vídeo";
@@ -1142,6 +1203,7 @@
           body: JSON.stringify({
             url: document.getElementById("inUrl").value,
             filename: document.getElementById("inFilename").value || null,
+            save_subdir: document.getElementById("inSubdir").value || null,
             max_connections: Number(document.getElementById("inConns").value || 8),
             queue_id: document.getElementById("inQueue").value || "main",
             expected_checksum: document.getElementById("inChecksum").value || "",
@@ -1155,6 +1217,7 @@
         const container = document.getElementById("ytContainer").value;
         const qual = document.getElementById("ytQuality").value;
         const downloadPlaylist = document.getElementById("ytPlaylistCheck").checked;
+        const subtitles = ytMode === "video" && document.getElementById("ytSubCheck").checked;
         const res = await api("/api/downloads/add", {
           method: "POST",
           body: JSON.stringify({
@@ -1164,6 +1227,7 @@
             container,
             quality: ytMode === "audio" ? "best" : qual,
             audio_bitrate: ytMode === "audio" ? qual : "320",
+            subtitles,
             download_playlist: downloadPlaylist,
           }),
         });
@@ -1200,14 +1264,37 @@
     }
   }
 
+  async function pauseAllDownloads() {
+    await api("/api/downloads/pause-all", { method: "POST" });
+    await loadSnapshot();
+  }
+  async function openDownloadsFolder() {
+    await api("/api/system/open-downloads", { method: "POST" });
+  }
+  async function checkYtdlpStatus() {
+    const el = document.getElementById("ytdlpVerBadge");
+    el.textContent = "A verificar...";
+    try {
+      const st = await api("/api/system/ytdlp-status");
+      el.textContent = st.update_available
+        ? `${st.yt_dlp_version} (nova: ${st.latest_version})`
+        : `${st.yt_dlp_version} (atualizada)`;
+    } catch {
+      el.textContent = "Indisponível";
+    }
+  }
+
   async function openSettingsModal() {
     const s = await api("/api/settings");
     document.getElementById("setDir").value = s.download_dir || "";
     document.getElementById("setConns").value = s.default_connections || 8;
     document.getElementById("setLimit").value = s.global_speed_limit_kbps || 0;
+    document.getElementById("setAutoCat").checked = Boolean(s.auto_categorize);
+    document.getElementById("setPostAction").value = s.post_complete_action || "none";
     const m = document.getElementById("settingsModal");
     m.classList.remove("hidden");
     m.classList.add("flex");
+    checkYtdlpStatus();
   }
   function closeSettingsModal() {
     const m = document.getElementById("settingsModal");
@@ -1221,6 +1308,8 @@
         download_dir: document.getElementById("setDir").value,
         default_connections: Number(document.getElementById("setConns").value),
         global_speed_limit_kbps: Number(document.getElementById("setLimit").value),
+        auto_categorize: document.getElementById("setAutoCat").checked,
+        post_complete_action: document.getElementById("setPostAction").value,
       }),
     });
     await loadSnapshot();

@@ -146,12 +146,13 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
             return 1
 
     # Open native desktop window via pywebview (Edge WebView2 on Windows)
+    tray_icon: Any = None
     try:
         import webview  # type: ignore[import-not-found]
         global _active_window
 
         icon_path = STATIC_DIR / "genniusdm.ico"
-        _active_window = webview.create_window(
+        win = webview.create_window(
             title=f"Gennius DM {__version__}",
             url=url,
             width=1240,
@@ -160,6 +161,64 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
             background_color="#0b0d11",
             hidden=hidden,
         )
+        _active_window = win
+        force_quit = {"value": False}
+
+        def _post_action(path: str) -> None:
+            try:
+                req = urllib.request.Request(f"{url}{path}", data=b"{}", method="POST")
+                urllib.request.urlopen(req, timeout=2.0).close()
+            except Exception:
+                pass
+
+        try:
+            import pystray  # type: ignore[import-not-found]
+            from PIL import Image  # type: ignore[import-not-found]
+
+            if icon_path.exists():
+                tray_img = Image.open(icon_path)
+            else:
+                tray_img = Image.new("RGBA", (64, 64), (37, 99, 235, 255))
+
+            def _on_tray_open(icon: Any, item: Any) -> None:
+                focus_desktop_window()
+
+            def _on_tray_pause_all(icon: Any, item: Any) -> None:
+                threading.Thread(target=_post_action, args=("/api/downloads/pause-all",), daemon=True).start()
+
+            def _on_tray_quit(icon: Any, item: Any) -> None:
+                force_quit["value"] = True
+                try:
+                    icon.stop()
+                except Exception:
+                    pass
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+
+            tray_menu = pystray.Menu(
+                pystray.MenuItem("Abrir Gennius DM", _on_tray_open, default=True),
+                pystray.MenuItem("Pausar todos os downloads", _on_tray_pause_all),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Sair do Gennius DM", _on_tray_quit),
+            )
+            tray_icon = pystray.Icon("GenniusDM", tray_img, f"Gennius DM {__version__}", tray_menu)
+            tray_icon.run_detached()
+
+            def _on_closing() -> bool:
+                if force_quit["value"]:
+                    return True
+                try:
+                    win.hide()
+                    return False
+                except Exception:
+                    return True
+
+            win.events.closing += _on_closing
+        except Exception as tray_exc:
+            print(f"[Gennius DM] Tray indisponivel ({tray_exc})")
+
         start_kwargs: dict[str, Any] = {}
         if sys.platform == "win32":
             start_kwargs["gui"] = "edgechromium"
@@ -180,6 +239,11 @@ def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False
             except KeyboardInterrupt:
                 pass
     finally:
+        if tray_icon is not None:
+            try:
+                tray_icon.stop()
+            except Exception:
+                pass
         if srv_state and srv_state.get("loop") is not None:
             loop = srv_state["loop"]
             if loop.is_running():

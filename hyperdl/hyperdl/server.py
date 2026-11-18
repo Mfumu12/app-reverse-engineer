@@ -133,6 +133,8 @@ class HyperDLServer:
         app.router.add_post("/api/downloads/add", self.handle_add_download)
         app.router.add_post("/api/downloads/import-curl", self.handle_import_curl)
         app.router.add_post("/api/downloads/add-batch", self.handle_add_batch)
+        app.router.add_post("/api/downloads/pause-all", self.handle_pause_all)
+        app.router.add_post("/api/downloads/resume-all", self.handle_resume_all)
         app.router.add_get("/api/downloads/{id}", self.handle_get_download)
         app.router.add_post("/api/downloads/{id}/pause", self.handle_pause)
         app.router.add_post("/api/downloads/{id}/resume", self.handle_resume)
@@ -159,6 +161,8 @@ class HyperDLServer:
         app.router.add_post("/api/extension/register-id", self.handle_extension_register_id)
         app.router.add_post("/api/youtube/probe", self.handle_youtube_probe)
         app.router.add_post("/api/desktop/focus", self.handle_desktop_focus)
+        app.router.add_post("/api/system/open-downloads", self.handle_open_downloads)
+        app.router.add_get("/api/system/ytdlp-status", self.handle_ytdlp_status)
 
         # Built-in Range & HLS Benchmark/Demo endpoints
         app.router.add_post("/api/demo/start", self.handle_demo_start)
@@ -231,12 +235,14 @@ class HyperDLServer:
             raise web.HTTPBadRequest(text=json.dumps({"error": "url is required"}), content_type="application/json")
         try:
             media_options = data.get("media_options")
-            if not media_options and any(k in data for k in ("media_mode", "quality", "container", "audio_bitrate")):
+            if not media_options and any(k in data for k in ("media_mode", "quality", "container", "audio_bitrate", "subtitles", "embed_metadata")):
                 media_options = {
                     "media_mode": data.get("media_mode", "video"),
                     "quality": data.get("quality", "best"),
                     "container": data.get("container", "mp4"),
                     "audio_bitrate": data.get("audio_bitrate", "320"),
+                    "subtitles": bool(data.get("subtitles", False)),
+                    "embed_metadata": bool(data.get("embed_metadata", True)),
                 }
 
             if bool(data.get("download_playlist", False)) and extract_playlist_id(url):
@@ -265,6 +271,7 @@ class HyperDLServer:
                 url,
                 filename=data.get("filename"),
                 save_dir=data.get("save_dir"),
+                save_subdir=data.get("save_subdir"),
                 queue_id=data.get("queue_id") or "main",
                 max_connections=data.get("max_connections"),
                 speed_limit_kbps=data.get("speed_limit_kbps"),
@@ -514,6 +521,64 @@ class HyperDLServer:
         ext_dir = sync_extension_files(EXT_DIR)
         res = register_native_messaging_host(ext_dir, extra_extension_ids=[ext_id])
         return web.json_response({"ok": True, "native_messaging": res})
+
+    async def handle_pause_all(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        count = await self.manager.pause_all()
+        return web.json_response({"paused": count})
+
+    async def handle_resume_all(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        count = await self.manager.resume_all()
+        return web.json_response({"resumed": count})
+
+    async def handle_open_downloads(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        import os
+        import subprocess
+
+        folder = str(self.manager.config.download_dir)
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform == "win32":
+                os.startfile(folder)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+            return web.json_response({"opened": True, "path": folder})
+        except Exception as exc:
+            return web.json_response({"opened": False, "path": folder, "error": str(exc)})
+
+    async def handle_ytdlp_status(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        import urllib.request
+        from .engine.youtube_engine import get_ffmpeg_path
+
+        local_ver = "—"
+        try:
+            import yt_dlp  # type: ignore[import-not-found]
+
+            local_ver = str(getattr(yt_dlp.version, "__version__", "unknown"))
+        except Exception:
+            pass
+
+        latest_ver = ""
+        try:
+            def _fetch_pypi() -> str:
+                with urllib.request.urlopen("https://pypi.org/pypi/yt-dlp/json", timeout=3.0) as r:
+                    return str(json.loads(r.read().decode("utf-8")).get("info", {}).get("version", ""))
+
+            latest_ver = await asyncio.to_thread(_fetch_pypi)
+        except Exception:
+            pass
+
+        return web.json_response({
+            "yt_dlp_version": local_ver,
+            "latest_version": latest_ver,
+            "update_available": bool(latest_ver and local_ver != "—" and latest_ver != local_ver),
+            "has_ffmpeg": bool(get_ffmpeg_path()),
+        })
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 

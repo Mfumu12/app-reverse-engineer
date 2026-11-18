@@ -196,6 +196,19 @@
     <span>Intercetar downloads do navegador</span>
   </label>
   <div class="field">
+    <label for="minSizeKb">Ignorar ficheiros menores que</label>
+    <select id="minSizeKb">
+      <option value="0">Capturar todos (0 KB)</option>
+      <option value="256">256 KB (Recomendado)</option>
+      <option value="1024">1 MB</option>
+      <option value="5120">5 MB</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="ignoredHosts">Sites ignorados (separados por vírgula)</label>
+    <input id="ignoredHosts" type="text" placeholder="ex.: localhost, banco.pt" />
+  </div>
+  <div class="field">
     <label for="serverUrl">Servidor local</label>
     <input id="serverUrl" type="text" value="http://127.0.0.1:8787" />
   </div>

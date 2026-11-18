@@ -21,10 +21,12 @@ function registerExtensionIdOnce(baseUrl, apiKey) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(["autoCapture"], (res) => {
-    if (typeof res.autoCapture !== "boolean") {
-      chrome.storage.local.set({ autoCapture: true });
-    }
+  chrome.storage.local.get(["autoCapture", "minSizeKb", "ignoredHosts"], (res) => {
+    const updates = {};
+    if (typeof res.autoCapture !== "boolean") updates.autoCapture = true;
+    if (typeof res.minSizeKb !== "number") updates.minSizeKb = 256;
+    if (typeof res.ignoredHosts !== "string") updates.ignoredHosts = "";
+    if (Object.keys(updates).length) chrome.storage.local.set(updates);
   });
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -39,8 +41,35 @@ async function getConfig() {
   return chrome.storage.local.get({
     serverUrl: DEFAULT_SERVER,
     autoCapture: true,
-    apiKey: ""
+    apiKey: "",
+    minSizeKb: 256,
+    ignoredHosts: ""
   });
+}
+
+function isIgnoredUrl(targetUrl, ignoredHostsRaw) {
+  if (!ignoredHostsRaw) return false;
+  try {
+    const host = new URL(targetUrl).hostname.toLowerCase();
+    const parts = ignoredHostsRaw
+      .split(/[\s,;]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return parts.some((p) => host === p || host.endsWith("." + p));
+  } catch {
+    return false;
+  }
+}
+
+async function getCookieHeader(targetUrl) {
+  if (!chrome.cookies || typeof chrome.cookies.getAll !== "function") return "";
+  try {
+    const list = await chrome.cookies.getAll({ url: targetUrl });
+    if (!list || !list.length) return "";
+    return list.map((c) => `${c.name}=${c.value}`).join("; ");
+  } catch {
+    return "";
+  }
 }
 
 async function isServerReachable(baseUrl) {
@@ -105,10 +134,22 @@ async function sendToGenniusDM(payload) {
     };
   }
 
+  // Enrich HTTP/HLS download with browser Cookie & User-Agent so authenticated links work seamlessly
+  const enriched = { ...payload };
+  const dlHeaders = { ...(enriched.headers || {}) };
+  if (!dlHeaders["Cookie"] && enriched.url) {
+    const cookieStr = await getCookieHeader(enriched.url);
+    if (cookieStr) dlHeaders["Cookie"] = cookieStr;
+  }
+  if (Object.keys(dlHeaders).length) enriched.headers = dlHeaders;
+  if (!enriched.user_agent && typeof navigator !== "undefined" && navigator.userAgent) {
+    enriched.user_agent = navigator.userAgent;
+  }
+
   const resp = await fetch(`${base}/api/downloads/add`, {
     method: "POST",
     headers,
-    body: JSON.stringify(payload)
+    body: JSON.stringify(enriched)
   });
   const data = await resp.json().catch(() => ({}));
   if (resp.ok) {
@@ -171,7 +212,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 
     const kind = detectMediaKind(details.url, ct);
     if (!kind) return;
-    if (kind !== "HLS" && size > 0 && size < 256 * 1024) return;
+    if (kind !== "HLS" && size > 0 && size < 512 * 1024) return;
 
     const list = tabMedia.get(details.tabId) || [];
     if (!list.some((m) => m.url === details.url)) {
@@ -186,6 +227,7 @@ chrome.webRequest.onHeadersReceived.addListener(
       tabMedia.set(details.tabId, list);
       chrome.action.setBadgeText({ tabId: details.tabId, text: String(list.length) });
       chrome.action.setBadgeBackgroundColor({ tabId: details.tabId, color: "#2563eb" });
+      chrome.tabs.sendMessage(details.tabId, { type: "tabMediaUpdated", items: list }).catch(() => {});
     }
   },
   { urls: ["<all_urls>"] },
@@ -213,8 +255,8 @@ function openConfirmDialog({ url, filename, totalBytes, referer }) {
   chrome.windows.create({
     url: chrome.runtime.getURL(`dialog.html?${params.toString()}`),
     type: "popup",
-    width: 480,
-    height: 390,
+    width: 490,
+    height: 445,
     focused: true
   });
 }
@@ -243,8 +285,14 @@ chrome.downloads.onCreated.addListener(async (item) => {
     return;
   }
   if (targetUrl.startsWith("http://127.0.0.1:8787") || targetUrl.startsWith("http://localhost:8787")) return;
+  if (isIgnoredUrl(targetUrl, cfg.ignoredHosts)) return;
 
-  // Pause browser download immediately so small files don't finish while GenniusDM boots
+  const totalBytes = item.totalBytes || item.fileSize || 0;
+  const minBytes = Math.max(0, Number(cfg.minSizeKb || 0)) * 1024;
+  if (totalBytes > 0 && minBytes > 0 && totalBytes < minBytes) {
+    return;
+  }
+
   let alive = await isServerReachable(cfg.serverUrl);
   if (!alive) {
     try {
@@ -272,7 +320,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
   openConfirmDialog({
     url: targetUrl,
     filename: fname,
-    totalBytes: item.totalBytes || item.fileSize || 0,
+    totalBytes,
     referer: item.referrer || ""
   });
 });
@@ -280,21 +328,25 @@ chrome.downloads.onCreated.addListener(async (item) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return false;
   if (msg.type === "getTabMedia") {
-    sendResponse({ items: tabMedia.get(msg.tabId) || [] });
+    const tid = msg.tabId || (sender.tab && sender.tab.id);
+    sendResponse({ items: tid ? tabMedia.get(tid) || [] : [] });
     return true;
   }
   if (msg.type === "sendUrl") {
     const reqHeaders = {};
-    if (msg.referer && /^https?:\/\//i.test(msg.referer)) reqHeaders["Referer"] = msg.referer;
+    const ref = msg.referer || (sender.tab && sender.tab.url) || "";
+    if (ref && /^https?:\/\//i.test(ref)) reqHeaders["Referer"] = ref;
     const payload = {
       url: msg.url,
       filename: msg.filename || undefined,
+      save_subdir: msg.save_subdir || undefined,
       max_connections: msg.max_connections || undefined,
       queue_id: msg.queue_id || undefined,
       media_mode: msg.media_mode || undefined,
       container: msg.container || undefined,
       quality: msg.quality || undefined,
       audio_bitrate: msg.audio_bitrate || undefined,
+      subtitles: Boolean(msg.subtitles),
       download_playlist: Boolean(msg.download_playlist),
       headers: Object.keys(reqHeaders).length ? reqHeaders : undefined
     };
