@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     p_desktop = sub.add_parser("desktop", help="Launch Gennius DM native desktop window")
     p_desktop.add_argument("--port", type=int, default=8787)
     p_desktop.add_argument("--download-dir", default="")
+    p_desktop.add_argument("--hidden", action="store_true", help="Start hidden in background ready for browser capture")
 
     p_serve = sub.add_parser("serve", help="Start HyperDL Web UI, REST API & WebSocket server")
     p_serve.add_argument("--host", default="0.0.0.0")
@@ -142,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg = HyperDLConfig(host="127.0.0.1", port=args.port)
         if args.download_dir:
             cfg.download_dir = Path(args.download_dir)
-        return run_desktop_app(cfg)
+        return run_desktop_app(cfg, hidden=bool(args.hidden))
 
     if args.command == "serve":
         cfg = HyperDLConfig(host=args.host, port=args.port, default_connections=args.connections, api_key=args.api_key)

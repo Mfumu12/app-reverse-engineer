@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 
+FIXED_EXTENSION_ID = "npegehopbmmbkpeabodpkmdhepljbggp"
+
+
 def _local_app_base() -> Path:
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA")
@@ -36,7 +39,32 @@ def sync_extension_files(source_dir: Path) -> Path:
     return target
 
 
-def register_native_messaging_host(ext_dir: Path) -> dict[str, Any]:
+def register_windows_autostart(enabled: bool = True) -> bool:
+    """Register Gennius DM to start silently in background on Windows login."""
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return False
+    try:
+        import winreg  # type: ignore[import-not-found]
+
+        run_key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        exe_path = str(Path(sys.executable).resolve())
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, run_key) as key:
+            if enabled:
+                winreg.SetValueEx(key, "GenniusDM", 0, winreg.REG_SZ, f'"{exe_path}" desktop --hidden')
+            else:
+                try:
+                    winreg.DeleteValue(key, "GenniusDM")
+                except FileNotFoundError:
+                    pass
+        return True
+    except Exception:
+        return False
+
+
+def register_native_messaging_host(
+    ext_dir: Path,
+    extra_extension_ids: list[str] | None = None,
+) -> dict[str, Any]:
     """Write Native Messaging Host manifest and register it in HKCU on Windows."""
     host_name = "com.genniusdm.host"
     manifest_path = _local_app_base() / f"{host_name}.json"
@@ -47,17 +75,36 @@ def register_native_messaging_host(ext_dir: Path) -> dict[str, Any]:
         bat_path = _local_app_base() / "genniusdm_nmh.bat"
         bat_path.write_text(f'@echo off\r\n"{exe_path}" native-messaging %*\r\n', encoding="utf-8")
         host_cmd = str(bat_path)
+        host_cfg = {"frozen": True, "exe_path": exe_path}
     else:
         host_cmd = str(Path(sys.executable).resolve())
+        host_cfg = {"frozen": False, "exe_path": str(Path(sys.executable).resolve())}
+
+    (_local_app_base() / "host_config.json").write_text(json.dumps(host_cfg, indent=2), encoding="utf-8")
+
+    origins: list[str] = [f"chrome-extension://{FIXED_EXTENSION_ID}/"]
+    if manifest_path.exists():
+        try:
+            existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for origin in existing.get("allowed_origins", []):
+                if isinstance(origin, str) and origin.startswith("chrome-extension://") and "aaaa" not in origin:
+                    if origin not in origins:
+                        origins.append(origin)
+        except Exception:
+            pass
+    for eid in extra_extension_ids or []:
+        clean = eid.strip()
+        if clean and len(clean) == 32:
+            origin = f"chrome-extension://{clean}/"
+            if origin not in origins:
+                origins.append(origin)
 
     manifest = {
         "name": host_name,
         "description": "Gennius DM Native Messaging Host",
         "path": host_cmd,
         "type": "stdio",
-        "allowed_origins": [
-            "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
-        ],
+        "allowed_origins": origins,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 

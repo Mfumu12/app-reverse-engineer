@@ -1,5 +1,24 @@
 const DEFAULT_SERVER = "http://127.0.0.1:8787";
+const NMH_HOST = "com.genniusdm.host";
 const tabMedia = new Map(); // tabId -> Array<{ url, kind, size, filename, referer }>
+const bypassUrls = new Set();
+
+let registeredId = false;
+
+function registerExtensionIdOnce(baseUrl, apiKey) {
+  if (registeredId || !chrome.runtime || !chrome.runtime.id) return;
+  registeredId = true;
+  const base = (baseUrl || DEFAULT_SERVER).replace(/\/$/, "");
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  fetch(`${base}/api/extension/register-id`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ extension_id: chrome.runtime.id })
+  }).catch(() => {
+    registeredId = false;
+  });
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(["autoCapture"], (res) => {
@@ -27,7 +46,7 @@ async function getConfig() {
 async function isServerReachable(baseUrl) {
   const base = (baseUrl || DEFAULT_SERVER).replace(/\/$/, "");
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 700);
+  const timer = setTimeout(() => ctrl.abort(), 650);
   try {
     const r = await fetch(`${base}/api/ping`, { signal: ctrl.signal });
     return r.ok;
@@ -38,11 +57,53 @@ async function isServerReachable(baseUrl) {
   }
 }
 
+function sendNativeWake() {
+  return new Promise((resolve) => {
+    if (!chrome.runtime || typeof chrome.runtime.sendNativeMessage !== "function") {
+      resolve(false);
+      return;
+    }
+    try {
+      chrome.runtime.sendNativeMessage(NMH_HOST, { action: "ensure_running" }, (resp) => {
+        if (chrome.runtime.lastError) {
+          resolve(false);
+          return;
+        }
+        resolve(Boolean(resp && resp.ok));
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function ensureServerRunning(baseUrl, apiKey) {
+  if (await isServerReachable(baseUrl)) {
+    registerExtensionIdOnce(baseUrl, apiKey);
+    return true;
+  }
+  const woke = await sendNativeWake();
+  if (woke) {
+    registerExtensionIdOnce(baseUrl, apiKey);
+    return true;
+  }
+  return false;
+}
+
 async function sendToGenniusDM(payload) {
   const cfg = await getConfig();
   const base = (cfg.serverUrl || DEFAULT_SERVER).replace(/\/$/, "");
   const headers = { "Content-Type": "application/json" };
   if (cfg.apiKey) headers["X-API-Key"] = cfg.apiKey;
+
+  const ready = await ensureServerRunning(base, cfg.apiKey);
+  if (!ready) {
+    return {
+      ok: false,
+      status: 0,
+      error: "Não foi possível iniciar o GenniusDM.exe automaticamente. Abre o GenniusDM.exe uma vez."
+    };
+  }
 
   const resp = await fetch(`${base}/api/downloads/add`, {
     method: "POST",
@@ -61,6 +122,11 @@ async function probeYoutubeOnServer(url) {
   const base = (cfg.serverUrl || DEFAULT_SERVER).replace(/\/$/, "");
   const headers = { "Content-Type": "application/json" };
   if (cfg.apiKey) headers["X-API-Key"] = cfg.apiKey;
+
+  const ready = await ensureServerRunning(base, cfg.apiKey);
+  if (!ready) {
+    return { ok: false, data: { error: "Gennius DM offline" } };
+  }
 
   const resp = await fetch(`${base}/api/youtube/probe`, {
     method: "POST",
@@ -156,6 +222,8 @@ function openConfirmDialog({ url, filename, totalBytes, referer }) {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const targetUrl = info.linkUrl || info.srcUrl;
   if (!targetUrl) return;
+  const cfg = await getConfig();
+  ensureServerRunning(cfg.serverUrl, cfg.apiKey).catch(() => {});
   openConfirmDialog({
     url: targetUrl,
     filename: guessFilename(targetUrl),
@@ -169,11 +237,29 @@ chrome.downloads.onCreated.addListener(async (item) => {
   if (!cfg.autoCapture) return;
   const targetUrl = item.finalUrl || item.url;
   if (!targetUrl || !targetUrl.startsWith("http")) return;
+  if (bypassUrls.has(targetUrl) || bypassUrls.has(item.url)) {
+    bypassUrls.delete(targetUrl);
+    bypassUrls.delete(item.url);
+    return;
+  }
   if (targetUrl.startsWith("http://127.0.0.1:8787") || targetUrl.startsWith("http://localhost:8787")) return;
 
-  // Only intercept if GenniusDM desktop server is actually running
-  const alive = await isServerReachable(cfg.serverUrl);
-  if (!alive) return;
+  // Pause browser download immediately so small files don't finish while GenniusDM boots
+  let alive = await isServerReachable(cfg.serverUrl);
+  if (!alive) {
+    try {
+      await chrome.downloads.pause(item.id);
+    } catch {}
+    alive = await ensureServerRunning(cfg.serverUrl, cfg.apiKey);
+    if (!alive) {
+      try {
+        await chrome.downloads.resume(item.id);
+      } catch {}
+      return;
+    }
+  } else {
+    registerExtensionIdOnce(cfg.serverUrl, cfg.apiKey);
+  }
 
   try {
     await chrome.downloads.cancel(item.id);
@@ -221,6 +307,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     probeYoutubeOnServer(msg.url)
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+  if (msg.type === "browserFallback" && msg.url) {
+    bypassUrls.add(msg.url);
+    setTimeout(() => bypassUrls.delete(msg.url), 15000);
+    chrome.downloads.download({ url: msg.url, filename: msg.filename || undefined }, () => {
+      sendResponse({ ok: true });
+    });
     return true;
   }
   return false;

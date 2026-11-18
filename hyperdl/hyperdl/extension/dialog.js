@@ -21,6 +21,18 @@ if (bytes > 0) {
 
 document.getElementById("cancelBtn").onclick = () => window.close();
 
+document.getElementById("browserBtn").onclick = () => {
+  const url = urlInput.value.trim();
+  if (!url) {
+    window.close();
+    return;
+  }
+  chrome.runtime.sendMessage(
+    { type: "browserFallback", url, filename: nameInput.value.trim() || undefined },
+    () => window.close()
+  );
+};
+
 startBtn.onclick = () => {
   const url = urlInput.value.trim();
   if (!url) return;

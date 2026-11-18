@@ -14,7 +14,11 @@ from typing import Any
 from aiohttp import web
 
 from . import __version__
-from .browser_installer import register_native_messaging_host, sync_extension_files
+from .browser_installer import (
+    register_native_messaging_host,
+    register_windows_autostart,
+    sync_extension_files,
+)
 from .config import HyperDLConfig
 from .engine.manager import DownloadManager
 from .server import EXT_DIR, STATIC_DIR, HyperDLServer
@@ -99,19 +103,38 @@ def _start_background_server(config: HyperDLConfig) -> tuple[threading.Thread, d
     return t, state
 
 
-def run_desktop_app(config: HyperDLConfig | None = None) -> int:
+def _focus_existing_instance(url: str) -> bool:
+    try:
+        req = urllib.request.Request(f"{url}/api/desktop/focus", data=b"{}", method="POST")
+        with urllib.request.urlopen(req, timeout=1.5) as r:
+            import json
+
+            data = json.loads(r.read().decode("utf-8"))
+            return bool(data.get("focused"))
+    except Exception:
+        return False
+
+
+def run_desktop_app(config: HyperDLConfig | None = None, *, hidden: bool = False) -> int:
     cfg = config or HyperDLConfig(host="127.0.0.1", port=8787)
     _ensure_stdio_streams(cfg.data_dir)
 
-    # Always extract the MV3 extension and register Native Messaging Host automatically
+    # Always extract the MV3 extension, register Native Messaging Host, and enable Windows background startup
     try:
         ext_dir = sync_extension_files(EXT_DIR)
         register_native_messaging_host(ext_dir)
+        register_windows_autostart(True)
     except Exception as exc:
         print(f"[Gennius DM] Aviso ao preparar extensao: {exc}")
 
     url = f"http://127.0.0.1:{cfg.port}"
     already_running = _server_alive(url)
+    if already_running:
+        if hidden:
+            return 0
+        if _focus_existing_instance(url):
+            return 0
+
     srv_thread: threading.Thread | None = None
     srv_state: dict[str, Any] | None = None
 
@@ -135,6 +158,7 @@ def run_desktop_app(config: HyperDLConfig | None = None) -> int:
             height=780,
             min_size=(920, 620),
             background_color="#0b0d11",
+            hidden=hidden,
         )
         start_kwargs: dict[str, Any] = {}
         if sys.platform == "win32":

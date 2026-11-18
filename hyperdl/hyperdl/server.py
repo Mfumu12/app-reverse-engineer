@@ -156,6 +156,7 @@ class HyperDLServer:
         app.router.add_get("/api/extension.zip", self.handle_extension_zip)
         app.router.add_get("/api/extension/status", self.handle_extension_status)
         app.router.add_post("/api/extension/install", self.handle_extension_install)
+        app.router.add_post("/api/extension/register-id", self.handle_extension_register_id)
         app.router.add_post("/api/youtube/probe", self.handle_youtube_probe)
         app.router.add_post("/api/desktop/focus", self.handle_desktop_focus)
 
@@ -501,6 +502,18 @@ class HyperDLServer:
 
         focused = focus_desktop_window()
         return web.json_response({"focused": focused})
+
+    async def handle_extension_register_id(self, request: web.Request) -> web.Response:
+        self._check_auth(request)
+        data = await request.json() if request.can_read_body else {}
+        ext_id = str(data.get("extension_id", "")).strip()
+        if not ext_id:
+            return web.json_response({"ok": False}, status=400)
+        from .browser_installer import register_native_messaging_host, sync_extension_files
+
+        ext_dir = sync_extension_files(EXT_DIR)
+        res = register_native_messaging_host(ext_dir, extra_extension_ids=[ext_id])
+        return web.json_response({"ok": True, "native_messaging": res})
 
     # --- Built-in Range & HLS Benchmark Endpoints ---
 
